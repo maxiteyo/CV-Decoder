@@ -1,0 +1,35 @@
+# --- Contexto interno y plan de trabajo (no se suben a Git) ---
+contexto.txt
+docs/plan-interno.md
+
+# --- Datos crudos y procesados (no se versionan) ---
+data/raw/
+data/processed/
+
+# --- Modelos entrenados y artefactos ---
+models/*
+!models/.gitkeep
+
+# --- Entornos virtuales ---
+.venv/
+venv/
+env/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Sistema / editores ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Claves y credenciales ---
+.env
+kaggle.json
