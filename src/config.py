@@ -25,5 +25,8 @@ REFS_DIR = RAW_DIR / "referencias"
 # --- Salidas procesadas ---
 NER_DIR = PROCESSED_DIR / "ner"
 
+# --- Benchmarks (PDFs de prueba y su texto esperado) ---
+PDFS_DIR = BENCHMARKS_DIR / "pdfs"
+
 # --- Reproducibilidad ---
 SEED = 42
