@@ -1,0 +1,21 @@
+# CV-Decoder — Dependencias del proyecto (versiones fijadas para reproducibilidad).
+# Instalación:
+#   python3 -m venv .venv
+#   .venv/bin/pip install -r requirements.txt
+#   .venv/bin/python -m spacy download en_core_web_sm
+
+# --- Procesamiento de datos ---
+numpy==2.5.4
+pandas==3.0.6
+scikit-learn==1.9.1
+tqdm==4.70.1
+
+# --- Procesamiento de lenguaje natural (Etapa A) ---
+spacy==3.8.16
+spacy-lookups-data==1.0.5
+
+# --- Pendientes para etapas siguientes (Etapa B/C) ---
+# pdfplumber==0.11.4            # leer PDFs (parseabilidad)
+# sentence-transformers==3.3.1  # similitud semántica (incluye PyTorch)
+# fastapi==0.115.0              # API /api/v1/analyze-cv
+# uvicorn==0.32.0               # servidor de la API
