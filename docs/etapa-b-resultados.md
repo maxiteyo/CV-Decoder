@@ -35,12 +35,22 @@ Script: `scripts/build_test_pdfs.py` + `scripts/eval_parseability.py`.
 
 ---
 
-## 2. Similitud semántica (dimensión 4) — EN PROGRESO
+## 2. Similitud semántica (dimensión 4) — MOTORES LISTOS, falta calibración
 
 **Qué se hizo:** un módulo con **dos motores** (`src/models/similarity.py`):
 - `tfidf`: línea base clásica (cuenta palabras). Sin descargas, rapidísima.
 - `embeddings`: modelo de lenguaje multilingüe `paraphrase-multilingual-mpnet-base-v2`
-  (entiende sinónimos y frases en español/inglés/spanglish).
+  (entiende sinónimos y frases en español/inglés/spanglish). **Probado y funcionando.**
+
+**Motor unificado:** `src/core/diagnostico.py` combina las 4 dimensiones y devuelve
+un JSON. Demo: `.venv/bin/python scripts/demo_diagnostico.py --motor embeddings`.
+
+Ejemplo real (par_005, oferta "Dotnet Developer"): puntaje global 53,4 con
+similitud 33,5 (embeddings) contra 5,2 (tfidf) — los embeddings captan mejor el
+parecido aunque no coincidan las palabras exactas.
+
+**Tiempo de inferencia (en caliente): 0,80 s** por CV+oferta → **cumple < 3 s**.
+(La primera vez tarda ~2 min por la descarga del modelo, que luego queda en caché.)
 
 **Medición (Spearman ≥ 0,75):** requiere **notas humanas**. Se generó la planilla
 `data/benchmarks/pares_para_calificar.csv` con **50 pares (CV + oferta)**.
@@ -49,11 +59,8 @@ Los dos integrantes deben completar la columna `puntaje_humano` (0 a 100).
 Pasos:
 1. Abrir `data/benchmarks/pares_para_calificar.csv`.
 2. En cada fila, poner en `puntaje_humano` cuánto encaja ese CV con esa oferta.
-3. Correr `.venv/bin/python scripts/eval_similarity.py --motor tfidf` (o `embeddings`).
+3. Correr `.venv/bin/python scripts/eval_similarity.py --motor embeddings`.
 4. El script calcula la correlación de Spearman contra las notas humanas.
-
-El baseline TF-IDF ya corre. Ejemplo de salida (sin notas aún):
-`par_001: Pharmacy Technician -> 7.2/100`.
 
 Script: `scripts/build_rating_pairs.py` + `scripts/eval_similarity.py`.
 
