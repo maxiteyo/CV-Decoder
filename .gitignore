@@ -5,6 +5,9 @@ docs/plan-interno.md
 # --- Datos crudos y procesados (no se versionan) ---
 data/raw/
 data/processed/
+# Benchmarks completos: incluyen cientos de CVs reales (PDFs) y las planillas
+# de calificación con texto de CVs. Se regeneran con los scripts de scripts/.
+data/benchmarks/
 
 # --- Modelos entrenados y artefactos ---
 models/*

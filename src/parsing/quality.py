@@ -13,19 +13,32 @@ _TOKEN = re.compile(r"[A-Za-z0-9]+")
 
 MIN_PALABRAS = 30
 MIN_RATIO_ALFANUMERICO = 0.5
+# Una "palabra pegada" es un token larguísimo sin espacios (el PDF perdió los
+# espacios al extraer, ej. "Lookingforapromising&challengingcareer"). Rompe el
+# matcheo de habilidades aunque el texto "se lea".
+PALABRA_PEGADA_MIN = 20
 
 
 def text_quality(text: str) -> dict:
-    """Devuelve medidas básicas de calidad del texto."""
+    """Devuelve medidas básicas de calidad del texto.
+
+    El ratio alfanumérico se mide sobre los caracteres que no son espacios:
+    un PDF con columnas deja muchos espacios de relleno y eso no es "texto
+    roto". Lo que importa es qué proporción de lo visible son letras/números.
+    """
     n = len(text)
     words = _WORD.findall(text)
     alnum = len(_ALNUM.findall(text))
+    visibles = sum(1 for c in text if not c.isspace())
+    pegadas = sum(1 for w in words if len(w) >= PALABRA_PEGADA_MIN)
     return {
         "caracteres": n,
         "palabras": len(words),
         "lineas": text.count("\n") + 1 if text else 0,
-        "ratio_alfanumerico": (alnum / n) if n else 0.0,
+        "ratio_alfanumerico": (alnum / visibles) if visibles else 0.0,
         "caracteres_rotos": text.count("\ufffd"),
+        "palabras_pegadas": pegadas,
+        "ratio_palabras_pegadas": (pegadas / len(words)) if words else 0.0,
     }
 
 

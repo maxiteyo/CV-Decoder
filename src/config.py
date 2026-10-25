@@ -27,6 +27,9 @@ NER_DIR = PROCESSED_DIR / "ner"
 
 # --- Benchmarks (PDFs de prueba y su texto esperado) ---
 PDFS_DIR = BENCHMARKS_DIR / "pdfs"
+# PDFs reales juntados por el equipo + etiquetas hechas a mano.
+PDFS_REALES_DIR = BENCHMARKS_DIR / "pdfs_reales"
+PDFS_REALES_LABELS = PDFS_REALES_DIR / "labels.csv"
 
 # --- Reproducibilidad ---
 SEED = 42
