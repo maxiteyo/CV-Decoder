@@ -29,6 +29,11 @@ sentence-transformers==6.1.0
 transformers==5.19.0
 torch==2.14.1+cpu
 
-# --- Pendiente para la API (Etapa C) ---
-# fastapi==0.115.0
-# uvicorn==0.32.0
+# --- API REST (Etapa C) ---
+fastapi==0.162.0
+uvicorn==0.54.0
+python-multipart==0.0.32
+
+# --- Pruebas automáticas ---
+pytest==9.1.1
+httpx2==2.16.0
