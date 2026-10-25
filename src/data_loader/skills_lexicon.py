@@ -23,6 +23,20 @@ BLACKLIST: set[str] = {
     "experience", "education", "details", "resume", "cv", "page", "total",
 }
 
+# Palabras del inglés general o abreviaturas ambiguas que en CVs reales generan
+# falsos positivos (aparecen en cualquier frase, no identifican una habilidad).
+# Se detectaron midiendo el banco de 187 CVs reales: "qualification" aparecía en
+# 96 CVs, "ms" en 80, "word" en 54. Las formas específicas ("ms office",
+# "ms word", "communication skills", "graphic design") se mantienen.
+# Nota: términos genéricos que sí son competencias ("communication", "planning",
+# "design", "monitoring") se conservan a propósito.
+RUIDO_CVS_REALES: set[str] = {
+    "qualification", "qualifications", "technology", "technologies", "word",
+    "objectives", "mba", "ip", "target", "expansion", "interviews",
+    "instruction", "legal", "express", "rice", "ts", "ms", "pt",
+    "years of experience", "years experience",
+}
+
 # Extrae cadenas entre comillas simples o dobles de un archivo TypeScript.
 _TS_STRING = re.compile(r"['\"]([A-Za-z0-9+#./&\- ]{2,40})['\"]")
 
@@ -84,4 +98,8 @@ def build_skill_lexicon(
         lexicon |= _load_job_skills(job_skills_csv)
 
     # Saneamos: quitamos lista negra y cadenas demasiado cortas.
-    return {item for item in lexicon if item not in BLACKLIST and len(item) >= 2}
+    return {
+        item
+        for item in lexicon
+        if item not in BLACKLIST and item not in RUIDO_CVS_REALES and len(item) >= 2
+    }

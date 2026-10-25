@@ -12,7 +12,8 @@ from __future__ import annotations
 import re
 
 from src.core.nlp_engine import get_nlp, get_skill_matcher
-from src.models.similarity import get_similarity_model, similitud_a_puntaje
+from src.data_loader.cleaning import resolve_overlaps
+from src.models.similarity import get_similarity_model
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"(?:\+?\d[\d\s.\-()]{6,}\d)")
@@ -23,6 +24,30 @@ SECCION_POR_ETIQUETA = {
     "Educacion": {"TITULO", "INSTITUCION", "ANIO_EGRESO"},
 }
 
+# Encabezados típicos de sección. Se usan como señal de apoyo: en CVs reales el
+# modelo de entidades puede no reconocer una empresa o un puesto, pero el título
+# "WORK EXPERIENCE" está ahí a la vista. Se exige que la línea sea corta para no
+# confundir una frase ("experience in sales...") con un encabezado.
+SECCION_ENCABEZADOS = {
+    "Experiencia": re.compile(
+        r"^(?:\W*)(work\s+)?(experience|employment|professional\s+experience|"
+        r"work\s+history|career\s+(history|summary)|employment\s+history|"
+        r"professional\s+background)\b",
+        re.IGNORECASE,
+    ),
+    "Educacion": re.compile(
+        r"^(?:\W*)(education|academic\s+(background|qualifications?)|"
+        r"educational\s+background|qualifications|studies)\b",
+        re.IGNORECASE,
+    ),
+    "Habilidades": re.compile(
+        r"^(?:\W*)(skills|technical\s+skills|core\s+competenc|competencies|"
+        r"technologies|areas\s+of\s+expertise|expertise)\b",
+        re.IGNORECASE,
+    ),
+}
+MAX_LARGO_ENCABEZADO = 60
+
 PESOS_POR_DEFECTO = {
     "similitud": 0.40,
     "secciones": 0.25,
@@ -31,31 +56,93 @@ PESOS_POR_DEFECTO = {
 }
 
 
-def extraer_entidades(texto: str) -> list[dict]:
-    nlp = get_nlp()
-    doc = nlp(texto)
+def _entidades_de_doc(doc) -> list[dict]:
     return [
         {"etiqueta": ent.label_, "texto": ent.text, "inicio": ent.start_char}
         for ent in doc.ents
     ]
 
 
+def _habilidades_de_doc(doc, texto: str) -> list[str]:
+    """Habilidades del diccionario dentro de un documento ya procesado.
+
+    Si dos términos se pisan ("communication" dentro de "communication skills"),
+    se queda el más largo: así no se cuenta dos veces la misma habilidad.
+    """
+    spans = [
+        {
+            "start": doc[start].idx,
+            "end": doc[end - 1].idx + len(doc[end - 1].text),
+            "label": "HABILIDAD",
+        }
+        for _, start, end in get_skill_matcher()(doc)
+    ]
+    return sorted(
+        {
+            texto[span["start"] : span["end"]].lower().strip()
+            for span in resolve_overlaps(spans)
+        }
+    )
+
+
+def extraer_entidades(texto: str) -> list[dict]:
+    """Entidades del modelo de NER (nombre, correo, empresa, puesto, etc.)."""
+    return _entidades_de_doc(get_nlp()(texto))
+
+
 def extraer_habilidades(texto: str) -> list[str]:
     """Habilidades encontradas con el diccionario curado (únicas, ordenadas)."""
-    matcher = get_skill_matcher()
-    doc = get_nlp()(texto)
-    encontradas = {doc[start:end].text.lower().strip() for _, start, end in matcher(doc)}
-    return sorted(encontradas)
+    return _habilidades_de_doc(get_nlp()(texto), texto)
 
 
-def detectar_secciones(texto: str, etiquetas: set[str]) -> dict[str, bool]:
+def _tiene_encabezado(texto: str, patron: re.Pattern) -> bool:
+    """True si alguna línea corta del CV es el encabezado de esa sección."""
+    for linea in texto.splitlines():
+        linea = linea.strip()
+        if 0 < len(linea) <= MAX_LARGO_ENCABEZADO and patron.match(linea):
+            return True
+    return False
+
+
+def detectar_secciones(
+    texto: str,
+    etiquetas: set[str],
+    habilidades: list[str] | None = None,
+) -> dict[str, bool]:
+    """Decide qué secciones tiene el CV combinando tres señales.
+
+    Señales: entidades del modelo, encabezados visibles y diccionario de
+    habilidades (+ email/teléfono para Contacto).
+    """
     presentes = {seccion: bool(etiquetas & labels) for seccion, labels in SECCION_POR_ETIQUETA.items()}
-    # Contacto también si hay email o teléfono.
+    for seccion, patron in SECCION_ENCABEZADOS.items():
+        if not presentes.get(seccion) and _tiene_encabezado(texto, patron):
+            presentes[seccion] = True
     if EMAIL_RE.search(texto) or PHONE_RE.search(texto):
         presentes["Contacto"] = True
-    # Habilidades por diccionario.
-    presentes["Habilidades"] = len(extraer_habilidades(texto)) > 0
+    if habilidades is None:
+        habilidades = extraer_habilidades(texto)
+    presentes["Habilidades"] = presentes.get("Habilidades", False) or len(habilidades) > 0
     return presentes
+
+
+def procesar_cv(texto: str) -> dict:
+    """Saca entidades, habilidades y secciones procesando el texto UNA sola vez.
+
+    El modelo de NLP es la parte más cara del diagnóstico; procesar el mismo CV
+    tres veces (para entidades, habilidades y secciones) triplicaba ese costo.
+    """
+    doc = get_nlp()(texto)
+    entidades = _entidades_de_doc(doc)
+    etiquetas = {e["etiqueta"] for e in entidades}
+    habilidades = _habilidades_de_doc(doc, texto)
+    secciones = detectar_secciones(texto, etiquetas, habilidades=habilidades)
+    return {
+        "entidades": entidades,
+        "etiquetas": etiquetas,
+        "habilidades": habilidades,
+        "secciones": secciones,
+    }
 
 
 def puntaje_parseabilidad(texto: str, min_palabras: int = 30, min_ratio: float = 0.5) -> float:
@@ -77,14 +164,15 @@ def analizar(
 ) -> dict:
     """Devuelve el diagnóstico completo de un CV contra una oferta."""
     pesos = pesos or PESOS_POR_DEFECTO
+    nlp = get_nlp()
 
-    entidades = extraer_entidades(cv_texto)
-    etiquetas = {e["etiqueta"] for e in entidades}
-    secciones = detectar_secciones(cv_texto, etiquetas)
+    # El CV se procesa una sola vez y de ahí salen entidades, skills y secciones.
+    perfil = procesar_cv(cv_texto)
+    skills_cv = perfil["habilidades"]
+    secciones = perfil["secciones"]
     faltantes_seccion = [s for s, presente in secciones.items() if not presente]
 
-    skills_cv = extraer_habilidades(cv_texto)
-    skills_oferta = extraer_habilidades(oferta_texto)
+    skills_oferta = _habilidades_de_doc(nlp(oferta_texto), oferta_texto)
     coincidencias = sorted(set(skills_cv) & set(skills_oferta))
     gaps = sorted(set(skills_oferta) - set(skills_cv))
     cobertura = (len(coincidencias) / len(skills_oferta)) if skills_oferta else 1.0
@@ -95,7 +183,7 @@ def analizar(
     dim_parseabilidad = puntaje_parseabilidad(cv_texto)
     dim_secciones = round(100 * sum(secciones.values()) / len(secciones), 1)
     dim_gap = round(100 * cobertura, 1)
-    dim_similitud = similitud_a_puntaje(similitud_valor)
+    dim_similitud = modelo.puntaje(similitud_valor)
 
     puntaje_global = round(
         pesos["similitud"] * dim_similitud
@@ -121,6 +209,10 @@ def analizar(
                 "total_oferta": len(skills_oferta),
                 "total_cv": len(skills_cv),
             },
-            "similitud": {"puntaje": dim_similitud, "motor": modelo.nombre, "crudo": round(similitud_valor, 4)},
+            "similitud": {
+                "puntaje": dim_similitud,
+                "motor": modelo.nombre,
+                "crudo": round(similitud_valor, 4),
+            },
         },
     }
