@@ -122,7 +122,7 @@ lenta del proyecto: leer dos documentos y decidir cuánto se parecen.
 pero quedaba margen de mejora. Además la escala estaba rota: el coseno máximo era
 0,072, así que el mejor par sacaba **7,2/100** y hundía el puntaje global.
 
-### Etapa B, parte 3 — Cierre con PDFs reales (esta etapa)
+### Etapa B, parte 3 — Cierre con PDFs reales
 
 El equipo juntó **221 PDFs reales** de CVs (37 MB, profesiones variadas, casi
 todos en inglés, algunos escaneados). Con eso se hizo:
@@ -139,6 +139,36 @@ todos en inglés, algunos escaneados). Con eso se hizo:
 6. **Mejoras que aparecieron de rebote** (ver §4): secciones por encabezados,
    limpieza del diccionario y corrección de doble conteo.
 
+### Etapa C — API REST (commit `2bcdb5c`)
+
+Se cerró el MVP con la API que faltaba: hasta acá todo se probaba con scripts.
+
+**Qué se hizo**
+
+1. `src/api/main.py`: endpoint `POST /api/v1/analyze-cv` en
+   `multipart/form-data` (PDF + texto de la oferta + motor opcional).
+2. `src/api/schemas.py`: contrato Pydantic de salida y de error, con ejemplos
+   visibles en Swagger.
+3. Validaciones explícitas: extensión y firma `%PDF`, máximo 5 MB, oferta de 20
+   a 20.000 caracteres. Un PDF escaneado se **rechaza** con 422 y explicación;
+   no se le asigna un puntaje 0.
+4. Errores con forma estable (`codigo`, `mensaje`, `sugerencia`) para todos los
+   4xx/5xx, incluidas las validaciones automáticas de FastAPI.
+5. `tests/test_api.py`: **16 pruebas** que generan PDFs legibles, escaneados y
+   rotos al vuelo (no dependen de `data/`), incluida una que verifica que no
+   queden archivos temporales.
+6. `scripts/cliente_api.py`: cliente de consola sin dependencias extra.
+7. Calentamiento al arrancar: el primer pedido pasó de **7,2 s a ~1,1 s**.
+
+**Decisiones**
+
+- El PDF se escribe en un temporal y se borra en un `finally`: la API no guarda
+  nada, ni siquiera el nombre como ruta.
+- El trabajo de CPU corre en un hilo aparte para no bloquear el bucle de la API.
+- TF-IDF sigue siendo el motor por defecto; `embeddings` queda disponible para
+  comparar, con la advertencia de que la primera consulta tarda ~35 s.
+- Sin CORS, auth ni base de datos: están fuera del alcance declarado.
+
 ---
 
 ## 3. Los números finales (tabla para memorizar)
@@ -154,6 +184,9 @@ todos en inglés, algunos escaneados). Con eso se hizo:
 | Tiempo del motor con texto ya extraído | **0,05–0,20 s** | — | — |
 | NER entidades (métrica secundaria) | F1 micro **0,47** | realista 0,4–0,6 | ✅ |
 | CVs reales con las 4 secciones detectadas | **59,9%** (112/187) | — | informativo |
+| API: pedido con TF-IDF (caliente) | **1,0–1,1 s** | < 3 s | ✅ |
+| API: arranque (carga + calentamiento) | **8,3 s** (una sola vez) | — | informativo |
+| API: primera consulta con embeddings | ~34,8 s (carga el modelo) | — | solo comparación |
 
 **Composición del banco de PDFs reales**
 
@@ -245,6 +278,21 @@ También se corrigió un doble conteo: si "communication" estaba dentro de
   medir la tasa real de escaneos y para análisis de errores futuros.
 - **Reescribir el PDF**: el producto diagnostica, no corrige.
 
+### 4.10 La API no guarda nada y rechaza lo que no puede leer
+
+El PDF se procesa en un archivo temporal que se borra siempre, incluso si el
+diagnóstico falla. No hay base de datos ni historial. Un escaneo no recibe un
+puntaje 0: se rechaza con **422 `PDF_SIN_TEXTO`**, porque sin texto no hay nada
+que diagnosticar y un 0 se confundiría con "CV malo". El mensaje dice qué pasó y
+qué hacer (subir un PDF con capa de texto o pasar por OCR).
+
+### 4.11 El contrato JSON es estable, aunque cambie el motor
+
+La respuesta siempre tiene las mismas cuatro dimensiones y el mismo formato de
+error. Cambiar TF-IDF por embeddings (o agregar un motor nuevo) no cambia el
+contrato: solo cambia el número. Eso permite que un cliente programe contra la
+API sin depender de los detalles internos.
+
 ---
 
 ## 5. Errores y sorpresas (sirven para mostrar rigor en la defensa)
@@ -265,6 +313,12 @@ También se corrigió un doble conteo: si "communication" estaba dentro de
    keyword gap habría sido ruido.
 6. **"Excel" como verbo.** "To excel in..." se cuenta como la herramienta Excel.
    Limitación conocida: el detector no distingue mayúsculas/contexto.
+7. **La primera consulta de la API tardaba 7,2 s.** El import de scikit-learn y
+   la compilación de spaCy se pagaban en el primer pedido. Se movieron al
+   arranque (`lifespan`): la primera consulta real bajó a ~1,1 s.
+8. **Un PDF escaneado no es un PDF con puntaje bajo.** Al principio se pensó en
+   devolver el diagnóstico con parseabilidad 0; se descartó porque confunde
+   "no se pudo leer" con "CV malo". Ahora se rechaza con 422 y una sugerencia.
 
 ---
 
@@ -295,7 +349,20 @@ También se corrigió un doble conteo: si "communication" estaba dentro de
   decisión empírica, documentada y fácil de recalibrar con más datos.
 - **¿Qué harían con más tiempo?**
   OCR, etiquetas de CVs reales para medir F1 real, ampliar el diccionario a
-  oficios, y la API de la Etapa C.
+  oficios y validar el techo de la escala con pares "buenos".
+- **¿La API guarda el CV que suben?**
+  No. Se escribe en un archivo temporal, se procesa y se borra; no hay base de
+  datos ni historial. El nombre original solo se devuelve como dato.
+- **¿Qué pasa si el PDF es un escaneo?**
+  Se detecta y se rechaza con 422 y un mensaje claro; no se le pone 0. Sin OCR no
+  hay texto que diagnosticar, y el OCR está fuera del alcance.
+- **¿Por qué la API usa TF-IDF y no embeddings?**
+  Porque es el motor que mejor ordena (0,95 vs 0,28) y el único que cumple el
+  límite de 3 s sin cargar un transformer. Embeddings queda disponible para
+  comparar, asumiendo la primera carga (~35 s).
+- **¿Cómo se prueba la API?**
+  `uvicorn src.api.main:app`, abrir `http://127.0.0.1:8000/docs` y usar "Try it
+  out"; o `python scripts/cliente_api.py`; o `python -m pytest -q` (16 pruebas).
 
 ---
 
@@ -304,6 +371,19 @@ También se corrigió un doble conteo: si "communication" estaba dentro de
 - **ATS**: sistema automático que filtra CVs antes de que los lea una persona.
 - **API REST**: interfaz por HTTP que recibe una petición y devuelve datos (acá,
   un JSON).
+- **Endpoint**: cada ruta concreta de la API (ej. `/api/v1/analyze-cv`).
+- **Swagger / OpenAPI**: página interactiva y contrato de la API que FastAPI
+  genera sola desde el código (`/docs`).
+- **`multipart/form-data`**: formato de pedido que manda archivos y campos de
+  texto en el mismo cuerpo.
+- **Uvicorn**: servidor que ejecuta la aplicación FastAPI.
+- **Pydantic**: biblioteca que valida los datos de entrada/salida contra tipos.
+- **422**: el pedido está bien formado pero el contenido no se puede procesar
+  (PDF escaneado, oferta corta, campo inválido).
+- **Threadpool**: hilos de trabajo para no bloquear el bucle principal mientras
+  se hace una tarea pesada.
+- **Archivo temporal**: archivo que se crea para procesar algo y se borra al
+  terminar.
 - **JSON**: formato de texto con pares clave–valor; es lo que devuelve el motor.
 - **NLP**: procesamiento de lenguaje natural; enseñarle a un programa a trabajar
   con texto.
@@ -347,6 +427,8 @@ También se corrigió un doble conteo: si "communication" estaba dentro de
 | `src/parsing/quality.py` | Decidir si el texto es usable y medir su calidad |
 | `src/core/diagnostico.py` | Motor que combina las 4 dimensiones |
 | `src/core/nlp_engine.py` | Cargar una sola vez el modelo y el diccionario |
+| `src/api/main.py` | API FastAPI: endpoint, validaciones, errores y calentamiento |
+| `src/api/schemas.py` | Contrato Pydantic de salida/error y ejemplos para Swagger |
 | `src/models/similarity.py` | Motores de similitud + calibración 0–100 |
 | `src/data_loader/skills_lexicon.py` | Diccionario curado y listas negras |
 | `scripts/build_pdf_labels.py` | Generar `labels.csv` de los PDFs reales |
@@ -355,8 +437,11 @@ También se corrigió un doble conteo: si "communication" estaba dentro de
 | `scripts/eval_similarity.py` | Medir Spearman contra notas humanas |
 | `scripts/eval_cv_reales.py` | Medir extracción sobre CVs reales |
 | `scripts/demo_diagnostico.py` | Probar un par o un PDF real de punta a punta |
+| `scripts/cliente_api.py` | Probar la API por HTTP desde la consola |
+| `tests/test_api.py` | 16 pruebas automáticas de la API |
 | `docs/etapa-a-resultados.md` | Resultados de datos y modelo de entidades |
 | `docs/etapa-b-resultados.md` | Resultados de parseabilidad, secciones y similitud |
+| `docs/etapa-c-api.md` | API: endpoints, errores, pruebas y guía de uso |
 
 Los datos (`data/`) y los reportes (`models/*.json`) **no se versionan**: pesan
 mucho y se regeneran con los scripts. El `.gitignore` los excluye a propósito.
@@ -382,6 +467,13 @@ python scripts/eval_similarity.py --matriz
 python scripts/eval_cv_reales.py
 ```
 
+Para la API (el modelo ya tiene que estar entrenado):
+
+```bash
+uvicorn src.api.main:app --reload    # en una terminal; abrir /docs
+python -m pytest -q                  # en otra; 16 pruebas
+```
+
 Los PDFs reales y la planilla de pares calificados son datos del equipo: no están
 en el repositorio, pero `labels.csv` y los reportes quedan generados localmente
 para auditoría.
@@ -404,22 +496,22 @@ Commits del proyecto (los más importantes):
 | `2762117` | README: métrica de F1 a secciones y limpieza de artefactos |
 | `ac74f47` | Etapa B: lectura de PDFs (parseabilidad) y similitud |
 | `9ed6a5c` | Etapa B: motor de diagnóstico (4 dimensiones) y embeddings |
+| `31f37a6` | Etapa B: parseabilidad medida sobre 221 PDFs reales |
+| `9dd6aee` | Etapa B: similitud calibrada y motor de una sola pasada |
+| `88039f5` | Etapa B: cierre de documentación (resultados, bitácora, README) |
+| `2bcdb5c` | Etapa C: API REST, 16 pruebas y cliente de consola |
 
 ---
 
 ## 11. Estado actual y próximo paso
 
-**Cerrado:** Etapa A (datos + NER + diccionario) y Etapa B (parseabilidad real,
-secciones, similitud, calibración, mediciones y documentación).
+**Cerrado:** Etapa A (datos + NER + diccionario), Etapa B (parseabilidad real,
+secciones, similitud, calibración, mediciones y documentación) y Etapa C (API
+FastAPI, pruebas y guía de uso).
 
-**Siguiente:** Etapa C — API FastAPI con `POST /api/v1/analyze-cv`:
-
-1. Esquema Pydantic de entrada (archivo PDF + texto de la oferta) y salida (JSON
-   de 4 dimensiones).
-2. Endpoint que use `read_pdf` + `analizar`, con respuestas 422 claras para PDF
-   roto o escaneado.
-3. Pruebas con Swagger/Postman y control de tamaño/tiempo.
-4. Documentar la API y preparar la demo de la exposición.
+**Siguiente:** preparar la defensa (presentación, demo y repaso de los números).
+La demo puede ser: levantar la API, mostrar `/docs`, diagnosticar un CV bueno
+(58,7), mostrar el rechazo de un escaneo (422) y correr las 16 pruebas.
 
 **Pendiente opcional:** calificar 10 pares nuevos "buenos" (CV y oferta del mismo
 oficio) para validar el techo de la escala; si se hacen, se recalibra con

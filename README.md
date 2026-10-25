@@ -64,7 +64,7 @@ Para superar al baseline, el modelo de IA debe cumplir con las siguientes métri
 
 > **Nota sobre habilidades:** en el dataset, las habilidades están anotadas como **bloques** (toda la lista junta), no una por una. Por eso la extracción de habilidades se resuelve con un **diccionario curado** (necesario además para el *keyword gap*), y no se le exige un F1 de token exacto.
 
-> **Resultados completos:** [`docs/etapa-a-resultados.md`](docs/etapa-a-resultados.md) (datos y modelo de entidades) y [`docs/etapa-b-resultados.md`](docs/etapa-b-resultados.md) (parseabilidad, secciones, similitud y limitaciones). El recorrido del proyecto, decisión por decisión, está en [`docs/bitacora-proyecto.md`](docs/bitacora-proyecto.md).
+> **Resultados completos:** [`docs/etapa-a-resultados.md`](docs/etapa-a-resultados.md) (datos y modelo de entidades), [`docs/etapa-b-resultados.md`](docs/etapa-b-resultados.md) (parseabilidad, secciones, similitud y limitaciones) y [`docs/etapa-c-api.md`](docs/etapa-c-api.md) (API REST, pruebas y guía de uso). El recorrido del proyecto, decisión por decisión, está en [`docs/bitacora-proyecto.md`](docs/bitacora-proyecto.md).
 
 ---
 
@@ -95,7 +95,7 @@ En concordancia con los lineamientos de la modalidad grupal, el esfuerzo inicial
 * **Procesamiento de Lenguaje Natural (NLP):** `spaCy` (modelo NER entrenado en **inglés**; el español se cubre con embeddings multilingües + diccionario bilingüe).
 * **Vectorización y Embeddings:** `scikit-learn` (TF-IDF, motor oficial) y `sentence-transformers` (Modelo: `paraphrase-multilingual-mpnet-base-v2`, evaluado y descartado para el ordenamiento).
 * **Puntuación / Scoring:** reglas ponderadas: similitud 0,40 · secciones 0,25 · brecha de habilidades 0,20 · parseabilidad 0,15. No se usa un clasificador entrenado porque no existen etiquetas de verdad para el score final.
-* **Servicio y API REST:** `FastAPI`, `pydantic`
+* **Servicio y API REST:** `FastAPI`, `pydantic`, `uvicorn` y `python-multipart`
 
 ---
 
@@ -117,6 +117,7 @@ cv-decoder/
 ├── docs/                   # Documentación de resultados y bitácora del proyecto
 │   ├── etapa-a-resultados.md
 │   ├── etapa-b-resultados.md
+│   ├── etapa-c-api.md      # API: endpoints, errores, pruebas y guía paso a paso
 │   └── bitacora-proyecto.md
 │
 ├── scripts/                # Scripts ejecutables (limpieza, entrenamiento, evaluación)
@@ -130,7 +131,8 @@ cv-decoder/
 │   ├── eval_parseability.py
 │   ├── eval_cv_reales.py
 │   ├── eval_similarity.py
-│   └── demo_diagnostico.py
+│   ├── demo_diagnostico.py
+│   └── cliente_api.py      # Probar la API desde la consola (sin dependencias extra)
 │
 ├── src/                    # Código fuente modularizado
 │   ├── __init__.py
@@ -141,6 +143,10 @@ cv-decoder/
 │   ├── parsing/            # Lectura de PDFs y control de parseabilidad (Etapa B)
 │   ├── models/             # Similitud (TF-IDF / embeddings) e inferencia
 │   └── utils/              # Funciones auxiliares y fijación de semillas
+│
+├── tests/                  # Pruebas automáticas (pytest)
+│   ├── conftest.py
+│   └── test_api.py         # 16 pruebas de la API (generan sus propios PDFs)
 │
 └── models/                 # Artefactos y pesos guardados + reportes de evaluación (no versionados)
 ```
@@ -154,6 +160,17 @@ pip install -r requirements.txt
 
 # Diagnosticar un PDF real contra una oferta de la planilla de pares
 python scripts/demo_diagnostico.py --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" --par par_005
+
+# Levantar la API y probarla desde el navegador
+uvicorn src.api.main:app --reload
+#   -> http://127.0.0.1:8000/docs
+#   -> GET http://127.0.0.1:8000/health
+
+# Probar la API desde la consola (con el servidor corriendo en otra terminal)
+python scripts/cliente_api.py --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" --par par_005
+
+# Correr las pruebas automáticas de la API
+python -m pytest -q
 
 # Reproducir todas las mediciones
 python scripts/build_pdf_labels.py
