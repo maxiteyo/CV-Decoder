@@ -503,14 +503,21 @@ y el contrato JSON es estable."*
 
 ## 14. Reproducir en otra máquina
 
-1. Clonar el repositorio e instalar dependencias (`README` §7.1).
-2. Descargar los datasets crudos (los enlaces están en el `README` §3) y ubicarlos
-   en `data/raw/` con la estructura que espera `src/config.py`.
+La guía completa, pensada para alguien que clona el repositorio por primera vez,
+está en [`docs/guia-de-uso.md`](guia-de-uso.md). Resumen:
+
+1. Clonar el repositorio e instalar dependencias (`README` §7.1). PyTorch CPU se
+   instala desde su índice propio y `en_core_web_sm` no viene en
+   `requirements.txt`.
+2. Descargar DataTurks y los dos repositorios de referencia del diccionario
+   (las rutas exactas están en la guía, §B.3).
 3. Generar el dataset y entrenar el modelo de entidades:
    ```bash
    python scripts/build_ner_dataset.py
-   python scripts/train_ner.py
+   python scripts/train_ner.py --sources dataturks --output ner_dataturks_sm
    ```
+   El nombre `ner_dataturks_sm` es el que espera la API; el valor por defecto de
+   `--output` es otro y la API no lo encontraría.
 4. (Opcional) Reproducir métricas de las etapas A y B:
    ```bash
    python scripts/build_test_pdfs.py

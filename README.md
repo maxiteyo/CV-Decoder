@@ -5,6 +5,10 @@
 > **Docente:** Ing. González, Hernando Alexis  
 > **Modalidad:** Grupal (MVP Funcional)  
 
+> **¿Querés probarlo ya?** Seguí la guía paso a paso:
+> [`docs/guia-de-uso.md`](docs/guia-de-uso.md). Incluye instalación desde cero,
+> Swagger, `curl`, pruebas automáticas, datasets y solución de problemas.
+
 ---
 
 ## 1. Contexto y Descripción del Problema
@@ -90,7 +94,7 @@ En concordancia con los lineamientos de la modalidad grupal, el esfuerzo inicial
 
 ## 6. Arquitectura Técnica y Stack Tecnológico
 
-* **Lenguaje Principal:** Python $\ge 3.10$
+* **Lenguaje Principal:** Python $\ge 3.10$ (el entorno probado es 3.12; las versiones fijadas de `numpy`/`pandas` requieren 3.12+)
 * **Extracción de Texto PDF:** `pdfminer.six` (texto, respeta mejor los espacios) + `pdfplumber` (páginas e imágenes para detectar escaneos)
 * **Procesamiento de Lenguaje Natural (NLP):** `spaCy` (modelo NER entrenado en **inglés**; el español se cubre con embeddings multilingües + diccionario bilingüe).
 * **Vectorización y Embeddings:** `scikit-learn` (TF-IDF, motor oficial) y `sentence-transformers` (Modelo: `paraphrase-multilingual-mpnet-base-v2`, evaluado y descartado para el ordenamiento).
@@ -115,9 +119,10 @@ cv-decoder/
 │   └── benchmarks/         # PDFs sintéticos, PDFs reales y planillas de calificación
 │
 ├── docs/                   # Documentación de resultados y bitácora del proyecto
+│   ├── guia-de-uso.md      # Instalación desde cero y prueba paso a paso
 │   ├── etapa-a-resultados.md
 │   ├── etapa-b-resultados.md
-│   ├── etapa-c-api.md      # API: endpoints, errores, pruebas y guía paso a paso
+│   ├── etapa-c-api.md      # API: endpoints, errores, pruebas y demo
 │   └── bitacora-proyecto.md
 │
 ├── scripts/                # Scripts ejecutables (limpieza, entrenamiento, evaluación)
@@ -153,10 +158,19 @@ cv-decoder/
 
 ### 7.1 Cómo ejecutar el diagnóstico hoy
 
+> La guía completa —con descarga de datasets, entrenamiento del modelo y
+> solución de problemas— está en [`docs/guia-de-uso.md`](docs/guia-de-uso.md).
+
 ```bash
 # Crear entorno e instalar dependencias
 python -m venv .venv && source .venv/bin/activate
+pip install "torch==2.14.1+cpu" --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+
+# Generar el dataset y entrenar el modelo de entidades (si models/ está vacío)
+python scripts/build_ner_dataset.py
+python scripts/train_ner.py --sources dataturks --output ner_dataturks_sm
 
 # Diagnosticar un PDF real contra una oferta de la planilla de pares
 python scripts/demo_diagnostico.py --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" --par par_005

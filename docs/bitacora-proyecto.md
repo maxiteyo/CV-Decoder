@@ -439,9 +439,10 @@ API sin depender de los detalles internos.
 | `scripts/demo_diagnostico.py` | Probar un par o un PDF real de punta a punta |
 | `scripts/cliente_api.py` | Probar la API por HTTP desde la consola |
 | `tests/test_api.py` | 16 pruebas automáticas de la API |
+| `docs/guia-de-uso.md` | Instalación desde cero, prueba paso a paso y reproducción |
 | `docs/etapa-a-resultados.md` | Resultados de datos y modelo de entidades |
 | `docs/etapa-b-resultados.md` | Resultados de parseabilidad, secciones y similitud |
-| `docs/etapa-c-api.md` | API: endpoints, errores, pruebas y guía de uso |
+| `docs/etapa-c-api.md` | API: endpoints, errores, pruebas y demo |
 
 Los datos (`data/`) y los reportes (`models/*.json`) **no se versionan**: pesan
 mucho y se regeneran con los scripts. El `.gitignore` los excluye a propósito.
@@ -450,14 +451,18 @@ mucho y se regeneran con los scripts. El `.gitignore` los excluye a propósito.
 
 ## 9. Reproducibilidad
 
-Todos los scripts usan la semilla 42. Para reproducir desde cero:
+Todos los scripts usan la semilla 42. La guía completa, con la descarga de
+datasets y las rutas exactas, está en
+[`docs/guia-de-uso.md`](guia-de-uso.md). Resumen:
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
+pip install "torch==2.14.1+cpu" --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
+python -m spacy download en_core_web_sm
 
 python scripts/build_ner_dataset.py     # dataset de entidades
-python scripts/train_ner.py             # modelo de entidades (~10 min en CPU)
+python scripts/train_ner.py --sources dataturks --output ner_dataturks_sm
 python scripts/build_test_pdfs.py       # 60 PDFs sintéticos
 python scripts/build_pdf_labels.py      # etiquetas de los PDFs reales
 python scripts/eval_parseability.py --reales
@@ -466,6 +471,9 @@ python scripts/eval_similarity.py --motor tfidf
 python scripts/eval_similarity.py --matriz
 python scripts/eval_cv_reales.py
 ```
+
+El nombre `ner_dataturks_sm` es el que busca la API; el valor por defecto de
+`--output` es `ner_cv` y no coincide.
 
 Para la API (el modelo ya tiene que estar entrenado):
 
