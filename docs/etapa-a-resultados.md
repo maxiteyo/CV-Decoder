@@ -17,7 +17,7 @@ se obtuvieron. Los números salen de los reportes guardados en `models/`.
 | Limpieza | `src/data_loader/cleaning.py` | Valida textos, arregla solapamientos y bordes. |
 | Lectura DataTurks | `src/data_loader/dataturks.py` | 220 CVs anotados (dato principal). |
 | Lectura refuerzo | `src/data_loader/mehyarmlaweh.py` | 5029 CVs ruidosos (solo HABILIDAD). |
-| Diccionario de habilidades | `src/data_loader/skills_lexicon.py` | 808 habilidades curadas. |
+| Diccionario de habilidades | `src/data_loader/skills_lexicon.py` | 790 habilidades curadas (eran 808; se limpiaron en la Etapa B). |
 | Armado del dataset | `scripts/build_ner_dataset.py` | Limpia, separa y guarda en formato spaCy. |
 | Entrenamiento | `scripts/train_ner.py` | Entrena y mide el modelo de entidades. |
 | Secciones | `scripts/eval_sections.py` | Mide la detección de secciones. |
@@ -72,19 +72,25 @@ que es justo lo que el producto necesita para el "keyword gap".
 ## 4. Resultado por secciones (lo que usa el producto)
 
 El diagnóstico necesita saber si el CV tiene cada sección. Medido sobre los 34 CVs
-de prueba, combinando el modelo de entidades + reglas (email/teléfono) + diccionario:
+de prueba, combinando el modelo de entidades + reglas (email/teléfono) + diccionario
++ **encabezados visibles** (`WORK EXPERIENCE`, `EDUCATION`, `SKILLS`):
 
 | Sección | F1 | Precisión | Recall | Aciertos |
 |---|---|---|---|---|
 | Contacto | 0,985 | 0,971 | 1,000 | 0,971 |
-| Experiencia | 0,938 | 0,938 | 0,938 | 0,882 |
+| Experiencia | 0,970 | 0,941 | 1,000 | 0,941 |
 | Educación | 0,921 | 0,853 | 1,000 | 0,853 |
 | Habilidades | 0,938 | 0,882 | 1,000 | 0,882 |
 
-**F1 macro: 0,945 · F1 micro: 0,946.**
+**F1 macro: 0,9532 · F1 micro: 0,9538.**
+
+> Los números de esta tabla se actualizaron al cerrar la Etapa B: se agregó la
+> señal de encabezados (antes el F1 macro era 0,945) y se limpió el diccionario.
+> El detalle del cambio y su efecto en CVs reales está en
+> `docs/etapa-b-resultados.md`.
 
 Extracción de habilidades con diccionario: **34/34 CVs** con al menos 1 habilidad,
-**920 habilidades** encontradas (**27,1 por CV**, 161 distintas).
+**830 habilidades** encontradas (**24,4 por CV**, 149 distintas).
 
 ---
 

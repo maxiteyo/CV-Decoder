@@ -15,7 +15,7 @@ fragmentos (0,50). El detalle está en `docs/etapa-b-resultados.md`.
 Calibración: la similitud del coseno vive entre 0 y 1, pero en documentos largos
 nunca se acerca a 1. Por eso cada motor define un "techo" (el valor que
 consideramos coincidencia total) y el puntaje se estira a 0-100. Sin esto, el
-mejor par real sacaba 7,6/100 y hundía el puntaje global.
+mejor par real sacaba 7,2/100 y hundía el puntaje global.
 """
 
 from __future__ import annotations
