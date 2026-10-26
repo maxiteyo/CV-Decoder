@@ -9,6 +9,10 @@ data/processed/
 # de calificación con texto de CVs. Se regeneran con los scripts de scripts/.
 data/benchmarks/
 
+# --- Paquete de datos para Maxi (duplica ~2 GB de datos) ---
+datos_para_maxi/
+datos_para_maxi.zip
+
 # --- Modelos entrenados y artefactos ---
 models/*
 !models/.gitkeep

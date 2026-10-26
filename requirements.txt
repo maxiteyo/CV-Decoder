@@ -23,6 +23,9 @@ pdfminer.six==20260107
 fpdf2==2.8.9
 pillow==12.3.0
 
+# --- Detección de idioma (scripts de datos locales) ---
+lingua-language-detector==2.0.2
+
 # --- Embeddings multilingües (Etapa B) ---
 # Requiere PyTorch CPU instalado aparte (ver arriba).
 sentence-transformers==6.1.0
