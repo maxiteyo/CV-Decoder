@@ -1,7 +1,7 @@
 # CV-Decoder — Nota de integración para Maxi
 
 > **Base:** `origin/main` (`f73dff6`, tu Etapa C).  
-> **Ramas locales:** `main` y `etapa-c-integrada`, 3 commits sobre `origin/main` (commiteado, sin push).
+> **Ramas locales:** `main` y `etapa-c-integrada`, con commits de datos, integración y docs sobre `origin/main` (sin push).
 > **Fecha:** 2026-11-06 · **Python verificado:** 3.12.3.
 
 **Resumen:** tu API (`src/api/main.py`, Swagger, 16 pruebas) es la oficial. Sofía
