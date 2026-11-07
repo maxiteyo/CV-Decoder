@@ -38,7 +38,8 @@ Métricas de la bitácora §3 — **todas reproducidas**:
 | `git fetch origin` | ✅ aparecieron los 3 commits de Etapa C de Maxi (`2bcdb5c`, `da5a514`, `f73dff6`) |
 | API oficial | ✅ la de Maxi (`src/api/main.py`): `/api/v1/analyze-cv`, `/health`, `/`, Swagger, 5 MB, errores con `codigo/mensaje/sugerencia` |
 | Implementación duplicada | ⚠️ descartada; quedó en `respaldo-etapa-c-sofia` + stash `etapa-c-sofia-antes-de-integrar` |
-| Rama de integración | ✅ `etapa-c-integrada`, creada desde `origin/main` (`f73dff6`) |
+| Rama de integración | ✅ `main` y `etapa-c-integrada` en `40a0ae8`, 2 commits sobre `origin/main` |
+| `main` local resuelta | ✅ rebase lineal sobre `origin/main`; conserva scripts de datos, `docs/metodologia-datos.md` y `lingua` |
 | Opcional — 10 pares buenos | ✅ `scripts/build_ceiling_pairs.py`; máximo coseno **0,1174** → techo **0,16** |
 | `TECHO_TFIDF` | ✅ `0.16` en `src/models/similarity.py` |
 | Tests | ✅ 16 de API (Maxi) + 4 de parseabilidad + 2 de diagnóstico = **22** |
@@ -58,18 +59,16 @@ Métricas de la bitácora §3 — **todas reproducidas**:
 1. [ ] **Calificar a mano los 10 pares buenos** de
    `data/benchmarks/pares_buenos.csv` (`puntaje_humano`, 0 a 100). Si un par no
    es del mismo oficio, borrarlo/aclararlo y volver a correr el script.
-2. [ ] **Commitear y pushear** la rama `etapa-c-integrada`.
-3. [ ] Decidir qué hacer con la `main` local: está en `8979aa5` (1 adelante y 3
-   atrás de `origin/main`). Ese commit tiene los scripts de datos y
-   `docs/metodologia-datos.md`; si se quieren conservar, hay que rebasear o
-   cherry-pickear sobre `origin/main`.
-4. [ ] Decidir si se conserva `respaldo-etapa-c-sofia` / el stash o se borran.
-5. [ ] **Landing en github.io** (10% de la rúbrica): arquitectura de IA + demo.
-6. [ ] **Directorio `/notebooks`** — lo pide el lineamiento §2.1 y no existe.
-7. [ ] Decidir si `pares_buenos.csv` se versiona o queda local (hoy `data/` está
+2. [ ] **Pushear** `etapa-c-integrada` (o `main`) y avisarle a Maxi.
+3. [ ] **Landing en github.io** (10% de la rúbrica): arquitectura de IA + demo.
+4. [ ] **Directorio `/notebooks`** — lo pide el lineamiento §2.1 y no existe.
+5. [ ] Decidir si `pares_buenos.csv` se versiona o queda local (hoy `data/` está
    ignorado).
-8. [ ] Revisar que la guía de Maxi use `--schema fine` (ya corregido acá) y
-   `httpx2==2.14.0` (ya corregido en `requirements.txt`).
+6. [ ] Decidir si se conservan las ramas de respaldo (`respaldo-etapa-c-sofia`,
+   `etapa-c-api`, `respaldo-etapa-c-integrada-pre-rebase`) o se borran.
+7. [x] `main` local resuelta con rebase lineal; conserva los scripts de datos de
+   `8979aa5` y el fix de `httpx2` + `lingua` en `requirements.txt`.
+8. [x] Guía de Maxi revisada: `--schema fine` y `httpx2==2.14.0`.
 
 > **Reproducción exacta**: con Python 3.12.3 y los pins del equipo, TODAS las
 > métricas de la bitácora coinciden (0,47 · 0,9532 · 0,9521 · 59,9% · 100%).
