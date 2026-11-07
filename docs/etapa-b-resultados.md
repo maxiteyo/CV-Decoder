@@ -138,7 +138,7 @@ inversiones evidentes). La métrica es **Spearman** (¿coincide el orden?).
 
 | Motor | Spearman | IC 95% | Pearson | Veredicto |
 |---|---|---|---|---|
-| **TF-IDF con stopwords ES+EN** | **0,9523** | [0,899 · 0,974] | 0,9407 | **Oficial** ✅ |
+| **TF-IDF con stopwords ES+EN** | **0,9521** | [0,899 · 0,974] | 0,9404 | **Oficial** ✅ |
 | Embeddings (documento entero) | 0,2779 | [0,011 · 0,513] | 0,2118 | Descartado ❌ |
 | Embeddings por fragmentos | 0,5003 | [0,256 · 0,686] | 0,5429 | Descartado ❌ |
 
@@ -174,21 +174,33 @@ con **7,2/100**, hundiendo el puntaje global (la similitud pesa 0,40).
 
 | Motor | Techo | Justificación |
 |---|---|---|
-| TF-IDF | 0,10 | 38% arriba del máximo observado (0,072): deja margen a un CV escrito a medida |
+| TF-IDF | 0,16 | 36% arriba del máximo de los 10 pares buenos (0,1174): deja margen a un CV escrito a medida |
 | Embeddings | 0,60 | ~0,2 entre textos no relacionados, ~0,6 entre textos del mismo tema |
 | Embeddings por fragmentos | 0,70 | mismo criterio, distribución más alta |
 
-El mapeo es lineal y monótono: **no cambia el orden** (el Spearman es idéntico),
-sólo hace interpretable la escala. El puntaje es una medida **relativa**: 100 =
-coincidencia total según lo observado en este corpus, no una probabilidad.
+El mapeo es lineal y monótono: **no cambia el orden**; el Spearman sólo se mueve
+por el redondeo a 1 decimal (0,9523 → 0,9521). El puntaje es una medida
+**relativa**: 100 = coincidencia total según lo observado en este corpus, no una
+probabilidad.
+
+**Validación con 10 pares nuevos (opcional).** Se armaron 10 pares CV↔oferta del
+mismo oficio (título equivalente + habilidades compartidas, sin reutilizar los 50
+pares ya calificados). El máximo coseno fue **0,1174**; con el techo 0,10 ese par
+saturaba en 100 y se perdía información. Se recalibró a **0,16** (36% arriba del
+nuevo máximo, el mismo margen que el criterio original). El máximo de la matriz
+aleatoria (0,0722) queda en 45/100 y el mejor par bueno en 73/100. Los pares
+quedan en `data/benchmarks/pares_buenos.csv` para que el equipo confirme a mano
+que son buenos y complete `puntaje_humano`.
 
 ### 3.4 Verificación de punta a punta
 
 | Caso | Resultado |
 |---|---|
-| CV real de software (cv 5) vs oferta .NET | global **58,7** · parseabilidad 100 · secciones 75 · similitud 62,3 |
-| CV real sin relación (cv 92) vs la misma oferta | global **36,4** · parseabilidad 100 · secciones 75 · similitud **6,5** |
+| CV real de software (cv 5) vs oferta .NET (`par_005`) | global **49,3** · parseabilidad 100 · secciones 75 · similitud 38,9 |
+| CV real sin relación (cv 92) vs la misma oferta | global **35,4** · parseabilidad 100 · secciones 75 · similitud **4,1** |
 | CV escaneado | rechazado con mensaje claro (sin OCR no hay diagnóstico) |
+
+Reproducir: `.venv/bin/python scripts/demo_diagnostico.py --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" --par par_005`.
 
 Tiempo del motor de diagnóstico (texto ya extraído): **0,05 s** de mediana con el
 equipo en reposo (0,20 s con otras aplicaciones abiertas).
@@ -232,8 +244,9 @@ bajo porque el diccionario es fuerte en tecnología y débil en oficios
    las secciones se apoyan también en encabezados y reglas.
 4. **Habilidades**: el diccionario cubre tecnología mucho mejor que oficios.
 5. **Notas humanas**: los 50 pares son al azar, sin ningún par realmente bueno
-   (máximo 47/100). Validan el **orden** de los motores; el techo de la escala se
-   fijó aparte, con el máximo observado en los 1.225 pares CV×oferta posibles.
+   (máximo 47/100). Validan el **orden** de los motores. El techo de la escala se
+   fijó aparte: primero con el máximo de los 1.225 pares aleatorios (0,0722) y
+   luego con 10 pares nuevos del mismo oficio (máximo 0,1174 → techo 0,16).
 6. **4.000 PDFs pendientes**: sin etiquetas no mejoran ninguna métrica. Sirven
    para medir la tasa real de escaneos en el mundo y para análisis de errores.
 
@@ -261,6 +274,7 @@ bajo porque el diccionario es fuerte en tecnología y débil en oficios
 .venv/bin/python scripts/eval_similarity.py --motor embeddings
 .venv/bin/python scripts/eval_similarity.py --motor embeddings_fragmentos
 .venv/bin/python scripts/eval_similarity.py --matriz   # justifica el techo 0-100
+.venv/bin/python scripts/build_ceiling_pairs.py        # opcional: 10 pares buenos
 
 # 6. Demostración con un PDF real
 .venv/bin/python scripts/demo_diagnostico.py --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" --par par_005

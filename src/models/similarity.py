@@ -55,10 +55,12 @@ _PALABRAS_VACIAS_EN = {
 PALABRAS_VACIAS = _PALABRAS_VACIAS_EN | _PALABRAS_VACIAS_ES
 
 # Techos de calibración: coseno que se considera "coincidencia total".
-# TF-IDF: 0,10 es el máximo observado en un par realmente bueno del dataset.
+# TF-IDF: 0,16. Se validó con 10 pares nuevos del mismo oficio (opcional): el
+# máximo fue 0,1174, así que 0,10 saturaba; 0,16 deja ~36% de margen, igual que
+# el criterio original sobre la matriz aleatoria (máximo 0,0722).
 # Embeddings: 0,60 (el modelo da ~0,2 entre textos no relacionados y ~0,6 entre
 # textos del mismo tema).
-TECHO_TFIDF = 0.10
+TECHO_TFIDF = 0.16
 TECHO_EMBEDDINGS = 0.60
 TECHO_EMBEDDINGS_FRAGMENTOS = 0.70
 

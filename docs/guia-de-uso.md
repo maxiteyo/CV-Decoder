@@ -268,13 +268,14 @@ archivo; `| python -m json.tool` ordena el JSON para leerlo mejor.
 Resultado esperado:
 
 ```text
-................                                                         [100%]
-16 passed in 27.00s
+......................                                                   [100%]
+22 passed in 30.00s
 ```
 
-Las 16 pruebas **generan sus propios PDFs** (legibles, escaneados y rotos) con
-`fpdf2` y `Pillow`, así que no dependen de `data/`. La primera corrida tarda unos
-30 segundos por la carga del modelo; las siguientes son más rápidas.
+Son **22 pruebas**: 16 de la API (generan sus propios PDFs legibles, escaneados y
+rotos con `fpdf2` y `Pillow`) + 4 de parseabilidad + 2 del motor de diagnóstico.
+No dependen de `data/`. La primera corrida tarda unos 30 segundos por la carga
+del modelo; las siguientes son más rápidas.
 
 ### A.9. Detener todo
 
@@ -478,7 +479,7 @@ Para el camino mínimo, `DataTurks` y `Referencias` tienen que decir `OK`.
 
 ```bash
 python scripts/build_ner_dataset.py
-python scripts/train_ner.py --sources dataturks --output ner_dataturks_sm
+python scripts/train_ner.py --sources dataturks --schema fine --output ner_dataturks_sm
 ```
 
 Qué hace cada comando:
@@ -491,6 +492,8 @@ Qué hace cada comando:
 2. **`train_ner.py`**: entrena el reconocedor de entidades sobre el modelo base
    `en_core_web_sm` y guarda el resultado en `models/ner_dataturks_sm/`.
    - `--sources dataturks` deja sólo el dataset principal.
+   - `--schema fine` es **obligatorio**: el default es `coarse` (6 etiquetas) y
+     el motor de diagnóstico usa el esquema fino (10 etiquetas).
    - `--output ner_dataturks_sm` es **obligatorio**: es el nombre exacto que
      busca la API. Si lo omitís, el modelo se guarda como `models/ner_cv/` y la
      API no lo encuentra.
@@ -534,7 +537,7 @@ curl -s http://127.0.0.1:8000/health
 .venv/bin/python -m pytest -q
 ```
 
-Resultado esperado: `estado: "ok"` y **16 pruebas en verde**. Después seguí desde
+Resultado esperado: `estado: "ok"` y **22 pruebas en verde**. Después seguí desde
 [A.4](#a4-probar-desde-el-navegador-swagger) para probar el diagnóstico.
 
 ---
@@ -615,7 +618,7 @@ muy distintas.
 |---|---|---|
 | `ModuleNotFoundError: No module named 'fastapi'` | El entorno virtual no está activado. | `source .venv/bin/activate` y verificá que aparezca `(.venv)` al inicio del prompt. |
 | `uvicorn: command not found` | Se instaló dentro del entorno pero no está activado. | `.venv/bin/uvicorn src.api.main:app --reload`. |
-| `No se encontró el modelo de entidades...` | Falta `models/ner_dataturks_sm/`. | Entrenalo con `python scripts/train_ner.py --sources dataturks --output ner_dataturks_sm`. |
+| `No se encontró el modelo de entidades...` | Falta `models/ner_dataturks_sm/`. | Entrenalo con `python scripts/train_ner.py --sources dataturks --schema fine --output ner_dataturks_sm`. |
 | La API arranca pero el modelo es otro | Se entrenó sin `--output ner_dataturks_sm`. | Volvé a entrenar con ese nombre o renombrá la carpeta `models/ner_cv` a `models/ner_dataturks_sm`. |
 | `Address already in use` | El puerto 8000 ya está ocupado (a veces por una API anterior). | Cerrá el otro proceso con `Ctrl+C`, o usá `uvicorn src.api.main:app --reload --port 8001` y cambiá la URL. |
 | `PDF_SIN_TEXTO` con un PDF que se ve bien | Es una imagen o un escaneo sin capa de texto. | Probalo con un PDF digital; el MVP no tiene OCR. |
@@ -631,6 +634,7 @@ muy distintas.
 | Kaggle devuelve 401/403 | Falta el token o no aceptaste las condiciones del dataset. | Configurá `~/.kaggle/kaggle.json` y aceptá las reglas en la página del dataset. |
 | `torch` no se instala | Se está buscando en el índice equivocado. | Instalá primero con `--index-url https://download.pytorch.org/whl/cpu`. |
 | `Python 3.10` u `3.11` | Las versiones fijadas de `numpy`/`pandas` piden 3.12+. | Instalá Python 3.12 y recreá `.venv`. |
+| `No matching distribution found for httpx2==2.16.0` | Esa versión no existe en PyPI. | El repo ya fija `httpx2==2.14.0` + `httpx==0.28.1`; actualizá `requirements.txt`. |
 | `cv (5).pdf` no existe | Los PDFs reales no están versionados. | Usá cualquier CV propio o el del Apéndice A. |
 | Las pruebas tardan mucho la primera vez | Se carga el modelo y se generan PDFs. | Es normal: ~30 segundos; después baja. |
 
@@ -691,18 +695,24 @@ Necesitás la planilla `data/benchmarks/pares_para_calificar.csv` con la columna
 ```bash
 python scripts/eval_similarity.py --motor tfidf
 python scripts/eval_similarity.py --matriz
+python scripts/build_ceiling_pairs.py   # opcional: valida el techo con 10 pares
 ```
 
 Resultado documentado:
 
 ```text
-Correlación de Spearman : 0.9523  (objetivo >= 0.75)
-Pearson (magnitud)      : 0.9407
+Correlación de Spearman : 0.9521  (objetivo >= 0.75)
+Pearson (magnitud)      : 0.9404
 ```
 
 `--matriz` muestra por qué se eligió el “techo” de calibración de cada motor
-(TF-IDF 0,10; embeddings 0,60; fragmentos 0,70). El techo no cambia el orden de
+(TF-IDF 0,16; embeddings 0,60; fragmentos 0,70). El techo no cambia el orden de
 los CVs: sólo estira la escala para que el mejor par no saque 7/100.
+
+El techo 0,16 se validó con **10 pares nuevos del mismo oficio**: el máximo
+coseno fue **0,1174** (con el techo anterior 0,10 saturaba en 100). El script
+deja `data/benchmarks/pares_buenos.csv` con `puntaje_humano` vacío para que el
+equipo los revise y califique a mano.
 
 Si no tenés la planilla, podés generar una **sin notas** y calificarla vos:
 
@@ -730,10 +740,11 @@ Estos reportes se guardan en `models/*.json` para auditoría.
 | Exactitud por sección | 0,9118 | `eval_sections.py` |
 | Parseabilidad sintética | 60/60 | `build_test_pdfs.py` + `eval_parseability.py` |
 | Parseabilidad real | 210/210 | requiere los 221 PDFs del equipo |
-| Spearman de similitud | 0,9523 | requiere las 50 notas humanas |
-| Pearson de similitud | 0,9407 | requiere las 50 notas humanas |
+| Spearman de similitud | 0,9521 | requiere las 50 notas humanas |
+| Pearson de similitud | 0,9404 | requiere las 50 notas humanas |
+| Techo TF-IDF validado | 0,16 (máx. 0,1174) | `build_ceiling_pairs.py` (10 pares) |
 | F1 de entidades (secundaria) | 0,4679 | `train_ner.py` (puede variar) |
-| Pruebas de la API | 16/16 | `pytest -q` |
+| Pruebas en total | 22/22 | `pytest -q` (16 API + 6 núcleo) |
 
 ---
 
@@ -747,9 +758,9 @@ permite:
 | Entrenar el NER | **Sí** | DataTurks + los dos repos de referencia. |
 | F1 de secciones ≈ 0,95 | **Sí** | El conjunto de prueba sale de DataTurks; puede variar unas centésimas. |
 | Parseabilidad sintética 60/60 | **Sí** | Los PDFs se generan con `fpdf2` y `Pillow`. |
-| Las 16 pruebas de la API | **Sí** | Generan sus propios PDFs; sólo necesitan el modelo. |
+| Las 22 pruebas (API + núcleo) | **Sí** | Generan sus propios PDFs; sólo necesitan el modelo. |
 | Parseabilidad real 210/210 | **No** | Requiere los 221 PDFs del equipo y sus etiquetas. |
-| Spearman 0,9523 | **No** | Requiere las 50 calificaciones humanas del equipo. |
+| Spearman 0,9521 | **No** | Requiere las 50 calificaciones humanas del equipo. |
 | Tiempos de respuesta exactos | **No** | Dependen del hardware. El orden de magnitud sí se reproduce. |
 
 Los datos que faltan **no son un error de instalación**: se excluyeron a propósito
@@ -774,8 +785,11 @@ personas reales). El código y los scripts para procesarlos sí están versionad
 | `src/models/similarity.py` | TF-IDF, embeddings y calibración. |
 | `scripts/build_ner_dataset.py` | Limpieza y splits del dataset de entidades. |
 | `scripts/train_ner.py` | Entrenamiento del modelo de entidades. |
+| `scripts/build_ceiling_pairs.py` | Opcional: 10 pares buenos y validación del techo. |
 | `scripts/cliente_api.py` | Cliente HTTP de consola. |
 | `tests/test_api.py` | 16 pruebas automáticas de la API. |
+| `tests/test_quality.py` | 4 pruebas de parseabilidad. |
+| `tests/test_diagnostico.py` | 2 pruebas del motor de diagnóstico. |
 | `data/` | Datos crudos, procesados y benchmarks (no versionado). |
 | `models/` | Modelo entrenado y reportes (no versionado). |
 

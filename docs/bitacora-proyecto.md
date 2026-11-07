@@ -177,13 +177,14 @@ Se cerró el MVP con la API que faltaba: hasta acá todo se probaba con scripts.
 |---|---|---|---|
 | Secciones (F1 macro, 34 CVs de prueba) | **0,9532** | ≥ 0,80 | ✅ |
 | Secciones (F1 micro) | **0,9538** | — | — |
-| Similitud (Spearman, 50 pares sobre 25 CVs) | **0,9523** [IC 95%: 0,899–0,974] | ≥ 0,75 | ✅ |
+| Similitud (Spearman, 50 pares sobre 25 CVs) | **0,9521** [IC 95%: 0,899–0,974] | ≥ 0,75 | ✅ |
 | Parseabilidad PDFs reales (210 únicos) | **100%** (187/187 legibles, 23/23 escaneados) | ≥ 90% | ✅ |
 | Parseabilidad PDFs sintéticos (60) | **100%** (60/60) | ≥ 90% | ✅ |
 | Tiempo por PDF (lectura + NLP) | **0,5 s** en reposo · **1,8 s** con el equipo cargado | < 3 s | ✅ |
 | Tiempo del motor con texto ya extraído | **0,05–0,20 s** | — | — |
 | NER entidades (métrica secundaria) | F1 micro **0,47** | realista 0,4–0,6 | ✅ |
 | CVs reales con las 4 secciones detectadas | **59,9%** (112/187) | — | informativo |
+| Techo TF-IDF con 10 pares buenos (opcional) | **0,16** (máximo coseno 0,1174) | — | ✅ |
 | API: pedido con TF-IDF (caliente) | **1,0–1,1 s** | < 3 s | ✅ |
 | API: arranque (carga + calentamiento) | **8,3 s** (una sola vez) | — | informativo |
 | API: primera consulta con embeddings | ~34,8 s (carga el modelo) | — | solo comparación |
@@ -214,7 +215,7 @@ Se midieron tres motores contra las 50 notas humanas:
 
 | Motor | Spearman | Veredicto |
 |---|---|---|
-| TF-IDF con stopwords ES+EN | **0,9523** | Oficial |
+| TF-IDF con stopwords ES+EN | **0,9521** | Oficial |
 | Embeddings (documento entero) | 0,2779 | Descartado |
 | Embeddings por fragmentos | 0,5003 | Descartado |
 
@@ -225,12 +226,18 @@ mejor porque las ofertas y los CVs comparten términos concretos.
 
 ### 4.3 La escala 0–100 se calibra con un "techo"
 
-Se define qué coseno equivale a 100 puntos (TF-IDF: 0,10; embeddings: 0,60). El
-mapeo es lineal y monótono: **no cambia el orden** (el Spearman queda igual), solo
-hace que la escala sea interpretable. Sin esto, el mejor par real sacaba 7,2/100.
-El techo de 0,10 es **38% más alto que el coseno máximo de los 1.225 pares
-medidos** (0,072): deja margen para que un CV escrito a medida para una oferta
-puntúe más que cualquier par del banco.
+Se define qué coseno equivale a 100 puntos (TF-IDF: 0,16; embeddings: 0,60). El
+mapeo es lineal y monótono: **no cambia el orden** (el Spearman queda igual, salvo
+el redondeo a 1 decimal), solo hace que la escala sea interpretable. Sin esto, el
+mejor par real sacaba 7,2/100.
+
+El techo original de 0,10 estaba 38% arriba del máximo de los 1.225 pares
+aleatorios (0,0722). En el opcional se armaron **10 pares nuevos del mismo
+oficio** (título equivalente + habilidades compartidas): el máximo subió a
+**0,1174**, así que 0,10 saturaba. Se recalibró a **0,16** (36% de margen, el
+mismo criterio): el máximo aleatorio queda en 45/100 y el mejor par bueno en
+73/100. Los pares están en `data/benchmarks/pares_buenos.csv` para validación
+humana.
 
 ### 4.4 Dos lectores de PDF, no uno
 
@@ -343,10 +350,11 @@ API sin depender de los detalles internos.
 - **¿Qué pasa con un CV escaneado?**
   Se detecta y se rechaza con un mensaje claro. Sin OCR no hay texto que
   diagnosticar, y el OCR está fuera del alcance.
-- **¿Por qué el techo de calibración es 0,10?**
-  Porque está 38% arriba del coseno máximo observado en 1.225 pares CV×oferta
-  (0,072): deja margen a un CV hecho a medida sin inventar una escala. Es una
-  decisión empírica, documentada y fácil de recalibrar con más datos.
+- **¿Por qué el techo de calibración es 0,16?**
+  Porque está 36% arriba del coseno máximo de 10 pares nuevos del mismo oficio
+  (0,1174); el máximo de los 1.225 pares aleatorios era 0,0722 y el techo previo
+  (0,10) saturaba el mejor par bueno. Es una decisión empírica, documentada y
+  fácil de recalibrar con más datos.
 - **¿Qué harían con más tiempo?**
   OCR, etiquetas de CVs reales para medir F1 real, ampliar el diccionario a
   oficios y validar el techo de la escala con pares "buenos".
@@ -362,7 +370,7 @@ API sin depender de los detalles internos.
   comparar, asumiendo la primera carga (~35 s).
 - **¿Cómo se prueba la API?**
   `uvicorn src.api.main:app`, abrir `http://127.0.0.1:8000/docs` y usar "Try it
-  out"; o `python scripts/cliente_api.py`; o `python -m pytest -q` (16 pruebas).
+  out"; o `python scripts/cliente_api.py`; o `python -m pytest -q` (22 pruebas).
 
 ---
 
@@ -435,10 +443,13 @@ API sin depender de los detalles internos.
 | `scripts/eval_parseability.py` | Medir parseabilidad (sintéticos y reales) |
 | `scripts/eval_sections.py` | Medir F1 de detección de secciones |
 | `scripts/eval_similarity.py` | Medir Spearman contra notas humanas |
+| `scripts/build_ceiling_pairs.py` | Opcional: 10 pares buenos y validación del techo |
 | `scripts/eval_cv_reales.py` | Medir extracción sobre CVs reales |
 | `scripts/demo_diagnostico.py` | Probar un par o un PDF real de punta a punta |
 | `scripts/cliente_api.py` | Probar la API por HTTP desde la consola |
 | `tests/test_api.py` | 16 pruebas automáticas de la API |
+| `tests/test_quality.py` | 4 pruebas de parseabilidad |
+| `tests/test_diagnostico.py` | 2 pruebas del motor de diagnóstico |
 | `docs/guia-de-uso.md` | Instalación desde cero, prueba paso a paso y reproducción |
 | `docs/etapa-a-resultados.md` | Resultados de datos y modelo de entidades |
 | `docs/etapa-b-resultados.md` | Resultados de parseabilidad, secciones y similitud |
@@ -462,24 +473,26 @@ pip install -r requirements.txt
 python -m spacy download en_core_web_sm
 
 python scripts/build_ner_dataset.py     # dataset de entidades
-python scripts/train_ner.py --sources dataturks --output ner_dataturks_sm
+python scripts/train_ner.py --sources dataturks --schema fine --output ner_dataturks_sm
 python scripts/build_test_pdfs.py       # 60 PDFs sintéticos
 python scripts/build_pdf_labels.py      # etiquetas de los PDFs reales
 python scripts/eval_parseability.py --reales
 python scripts/eval_sections.py
 python scripts/eval_similarity.py --motor tfidf
 python scripts/eval_similarity.py --matriz
+python scripts/build_ceiling_pairs.py   # opcional: techo con 10 pares buenos
 python scripts/eval_cv_reales.py
 ```
 
 El nombre `ner_dataturks_sm` es el que busca la API; el valor por defecto de
-`--output` es `ner_cv` y no coincide.
+`--output` es `ner_cv` y no coincide. El esquema **fine** es obligatorio: el
+default de `train_ner.py` es `coarse` y no coincide con el que usa el motor.
 
 Para la API (el modelo ya tiene que estar entrenado):
 
 ```bash
 uvicorn src.api.main:app --reload    # en una terminal; abrir /docs
-python -m pytest -q                  # en otra; 16 pruebas
+python -m pytest -q                  # en otra; 22 pruebas
 ```
 
 Los PDFs reales y la planilla de pares calificados son datos del equipo: no están
@@ -519,8 +532,10 @@ FastAPI, pruebas y guía de uso).
 
 **Siguiente:** preparar la defensa (presentación, demo y repaso de los números).
 La demo puede ser: levantar la API, mostrar `/docs`, diagnosticar un CV bueno
-(58,7), mostrar el rechazo de un escaneo (422) y correr las 16 pruebas.
+(58,7), mostrar el rechazo de un escaneo (422) y correr las 22 pruebas.
 
-**Pendiente opcional:** calificar 10 pares nuevos "buenos" (CV y oferta del mismo
-oficio) para validar el techo de la escala; si se hacen, se recalibra con
-evidencia.
+**Opcional — techo validado y recalibrado:** se armaron 10 pares nuevos del mismo
+oficio; el máximo coseno fue **0,1174**, así que el techo 0,10 saturaba. Se
+recalibró TF-IDF a **0,16** con el mismo criterio de margen. Los pares quedan en
+`data/benchmarks/pares_buenos.csv` para que el equipo confirme a mano que son
+buenos y complete `puntaje_humano`.

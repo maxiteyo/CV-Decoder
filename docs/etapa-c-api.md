@@ -1,7 +1,7 @@
 # Etapa C — API REST del MVP
 
 **Fecha de cierre:** 2026-10-25
-**Estado:** terminada y probada (16 pruebas automáticas en verde).
+**Estado:** terminada y probada (16 pruebas de API + 6 del núcleo = 22 en verde).
 **Punto de entrada:** `src.api.main:app`
 **Endpoint principal:** `POST /api/v1/analyze-cv`
 
@@ -324,7 +324,7 @@ El esquema completo está en `src/api/schemas.py` y se puede ver en vivo en
 
 | Motor | Primera consulta | Consultas siguientes | Veredicto |
 |---|---|---|---|
-| `tfidf` | ~1,1 s | ~1,0–1,1 s | **Oficial** (Spearman 0,9523) |
+| `tfidf` | ~1,1 s | ~1,0–1,1 s | **Oficial** (Spearman 0,9521) |
 | `embeddings` | ~35 s (carga el modelo) | ~2,4 s | Solo comparación (Spearman 0,2779) |
 | `embeddings_fragmentos` | ~35 s | similar a embeddings | Solo comparación (Spearman 0,5003) |
 
@@ -388,13 +388,15 @@ OCR está fuera del alcance.
 
 Archivo: `tests/test_api.py` (16 pruebas). Generan sus propios PDFs al vuelo con
 `fpdf2` y `Pillow`, así que **no dependen de `data/`** (que no se versiona).
+Se suman `tests/test_quality.py` (4 pruebas de parseabilidad) y
+`tests/test_diagnostico.py` (2 pruebas del motor): **22 en total**.
 
 ```bash
 .venv/bin/python -m pytest -q       # resumen
 .venv/bin/python -m pytest -v       # nombre por nombre
 ```
 
-Resultado: **16 passed** en ~27 s (el modelo se carga una vez).
+Resultado: **22 passed** en ~30 s (el modelo se carga una vez).
 
 Qué cubren:
 
@@ -408,8 +410,9 @@ Qué cubren:
 La prueba del PDF escaneado **genera una imagen real** dentro de un PDF (sin capa
 de texto), no simula el error: verifica el mismo camino que un usuario.
 
-> Nota técnica: `fastapi.testclient` con Starlette 1.10 pide `httpx2`; ya está en
-> `requirements.txt` como dependencia de pruebas. Sin él aparece un warning de
+> Nota técnica: `fastapi.testclient` con Starlette 1.10 pide `httpx2` y `httpx`;
+> ya están en `requirements.txt` como `httpx2==2.14.0` + `httpx==0.28.1`. La
+> versión `2.16.0` no existe en PyPI. Sin ellas aparece un warning de
 > deprecación (no un fallo).
 
 ---
@@ -462,7 +465,7 @@ con el texto ya extraído tarda 0,05–0,20 s.
 5. Subir el CV escaneado → mostrar el **422** con `PDF_SIN_TEXTO` y la sugerencia.
 6. Poner una oferta de dos palabras → mostrar **422** `OFERTA_MUY_CORTA`.
 7. Mostrar la pestaña **Schemas** de Swagger: el contrato es público.
-8. Cerrar con `.venv/bin/python -m pytest -q` → **16 passed**.
+8. Cerrar con `.venv/bin/python -m pytest -q` → **22 passed**.
 9. (Opcional) Mostrar `scripts/cliente_api.py` para probar sin navegador.
 
 Frase para el jurado: *"La API no guarda el CV, no requiere login y rechaza con
@@ -514,7 +517,7 @@ está en [`docs/guia-de-uso.md`](guia-de-uso.md). Resumen:
 3. Generar el dataset y entrenar el modelo de entidades:
    ```bash
    python scripts/build_ner_dataset.py
-   python scripts/train_ner.py --sources dataturks --output ner_dataturks_sm
+   python scripts/train_ner.py --sources dataturks --schema fine --output ner_dataturks_sm
    ```
    El nombre `ner_dataturks_sm` es el que espera la API; el valor por defecto de
    `--output` es otro y la API no lo encontraría.
@@ -546,6 +549,8 @@ funciona igual con cualquier PDF que se suba desde Swagger.
 | `src/api/__init__.py` | Marca el paquete. |
 | `tests/conftest.py` | Permite importar `src` al correr pytest. |
 | `tests/test_api.py` | 16 pruebas automáticas de la API. |
+| `tests/test_quality.py` | 4 pruebas de parseabilidad. |
+| `tests/test_diagnostico.py` | 2 pruebas del motor de diagnóstico. |
 | `scripts/cliente_api.py` | Cliente de consola (sin dependencias extra). |
 | `docs/etapa-c-api.md` | Este documento. |
 | `requirements.txt` | Dependencias nuevas fijadas. |

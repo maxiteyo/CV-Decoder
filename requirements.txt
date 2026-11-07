@@ -1,6 +1,8 @@
 # CV-Decoder — Dependencias del proyecto (versiones fijadas para reproducibilidad).
 #
 # Instalación:
+#   # Requiere Python 3.12 (numpy 2.5.4 / pandas 3.0.6 / scikit-learn 1.9.1).
+#   # Con uv:  uv python install 3.12.3 && uv venv --python 3.12.3 .venv
 #   python3 -m venv .venv
 #   # PyTorch en versión CPU (más liviano, no requiere GPU):
 #   .venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
@@ -39,4 +41,7 @@ python-multipart==0.0.32
 
 # --- Pruebas automáticas ---
 pytest==9.1.1
-httpx2==2.16.0
+# httpx2==2.16.0 no existe en PyPI (la última es 2.14.0). Starlette 1.10 pide
+# httpx2>=2.0 y httpx para el TestClient, por eso van las dos.
+httpx2==2.14.0
+httpx==0.28.1

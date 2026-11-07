@@ -94,7 +94,7 @@ En concordancia con los lineamientos de la modalidad grupal, el esfuerzo inicial
 
 ## 6. Arquitectura Técnica y Stack Tecnológico
 
-* **Lenguaje Principal:** Python $\ge 3.10$ (el entorno probado es 3.12; las versiones fijadas de `numpy`/`pandas` requieren 3.12+)
+* **Lenguaje Principal:** Python **3.12** (el entorno reproducible del equipo usa 3.12.3; los pins de `requirements.txt` lo requieren)
 * **Extracción de Texto PDF:** `pdfminer.six` (texto, respeta mejor los espacios) + `pdfplumber` (páginas e imágenes para detectar escaneos)
 * **Procesamiento de Lenguaje Natural (NLP):** `spaCy` (modelo NER entrenado en **inglés**; el español se cubre con embeddings multilingües + diccionario bilingüe).
 * **Vectorización y Embeddings:** `scikit-learn` (TF-IDF, motor oficial) y `sentence-transformers` (Modelo: `paraphrase-multilingual-mpnet-base-v2`, evaluado y descartado para el ordenamiento).
@@ -136,6 +136,7 @@ cv-decoder/
 │   ├── eval_parseability.py
 │   ├── eval_cv_reales.py
 │   ├── eval_similarity.py
+│   ├── build_ceiling_pairs.py # Opcional: 10 pares buenos y validación del techo
 │   ├── demo_diagnostico.py
 │   └── cliente_api.py      # Probar la API desde la consola (sin dependencias extra)
 │
@@ -151,7 +152,9 @@ cv-decoder/
 │
 ├── tests/                  # Pruebas automáticas (pytest)
 │   ├── conftest.py
-│   └── test_api.py         # 16 pruebas de la API (generan sus propios PDFs)
+│   ├── test_api.py         # 16 pruebas de la API (generan sus propios PDFs)
+│   ├── test_quality.py     # 4 pruebas de parseabilidad
+│   └── test_diagnostico.py # 2 pruebas del motor de diagnóstico
 │
 └── models/                 # Artefactos y pesos guardados + reportes de evaluación (no versionados)
 ```
@@ -170,7 +173,7 @@ python -m spacy download en_core_web_sm
 
 # Generar el dataset y entrenar el modelo de entidades (si models/ está vacío)
 python scripts/build_ner_dataset.py
-python scripts/train_ner.py --sources dataturks --output ner_dataturks_sm
+python scripts/train_ner.py --sources dataturks --schema fine --output ner_dataturks_sm
 
 # Diagnosticar un PDF real contra una oferta de la planilla de pares
 python scripts/demo_diagnostico.py --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" --par par_005
@@ -192,4 +195,9 @@ python scripts/eval_parseability.py --reales
 python scripts/eval_sections.py
 python scripts/eval_similarity.py --motor tfidf
 python scripts/eval_similarity.py --matriz
+python scripts/build_ceiling_pairs.py   # opcional: valida el techo con 10 pares
 ```
+
+> El techo TF-IDF quedó en **0,16** tras validarlo con 10 pares nuevos del mismo
+> oficio (máximo coseno 0,1174). Los pares están en
+> `data/benchmarks/pares_buenos.csv` para calificación humana.
