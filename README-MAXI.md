@@ -1,7 +1,7 @@
 # CV-Decoder — Nota de integración para Maxi
 
 > **Base:** `origin/main` (`f73dff6`, tu Etapa C).  
-> **Ramas locales:** `main` y `etapa-c-integrada` en `40a0ae8` (commiteado, sin push).
+> **Ramas locales:** `main` y `etapa-c-integrada`, 3 commits sobre `origin/main` (commiteado, sin push).
 > **Fecha:** 2026-11-06 · **Python verificado:** 3.12.3.
 
 **Resumen:** tu API (`src/api/main.py`, Swagger, 16 pruebas) es la oficial. Sofía
@@ -124,9 +124,10 @@ aclararlo en `comentario`. Con esas notas se puede volver a validar la escala.
 
 ## 4. Estado de Git
 
-- Ramas actuales: **`main` y `etapa-c-integrada`** en `40a0ae8`.
+- Ramas actuales: **`main` y `etapa-c-integrada`**, ambas en el mismo commit.
 - Historia lineal sobre tu Etapa C: `origin/main` (`f73dff6`) → `05f7b4e`
-  (scripts de datos de Sofía, rebaseados) → `40a0ae8` (integración + techo).
+  (scripts de datos de Sofía, rebaseados) → `40a0ae8` (integración + techo) →
+  commit de docs con el estado final.
 - **Sin push todavía**: los commits están sólo en la máquina de Sofía.
 - El `main` viejo (`8979aa5`) quedó en `respaldo-etapa-c-sofia`,
   `etapa-c-api` y en el stash; el commit previo al rebase quedó en

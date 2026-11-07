@@ -38,7 +38,7 @@ Métricas de la bitácora §3 — **todas reproducidas**:
 | `git fetch origin` | ✅ aparecieron los 3 commits de Etapa C de Maxi (`2bcdb5c`, `da5a514`, `f73dff6`) |
 | API oficial | ✅ la de Maxi (`src/api/main.py`): `/api/v1/analyze-cv`, `/health`, `/`, Swagger, 5 MB, errores con `codigo/mensaje/sugerencia` |
 | Implementación duplicada | ⚠️ descartada; quedó en `respaldo-etapa-c-sofia` + stash `etapa-c-sofia-antes-de-integrar` |
-| Rama de integración | ✅ `main` y `etapa-c-integrada` en `40a0ae8`, 2 commits sobre `origin/main` |
+| Rama de integración | ✅ `main` y `etapa-c-integrada`, 3 commits sobre `origin/main` |
 | `main` local resuelta | ✅ rebase lineal sobre `origin/main`; conserva scripts de datos, `docs/metodologia-datos.md` y `lingua` |
 | Opcional — 10 pares buenos | ✅ `scripts/build_ceiling_pairs.py`; máximo coseno **0,1174** → techo **0,16** |
 | `TECHO_TFIDF` | ✅ `0.16` en `src/models/similarity.py` |
