@@ -168,7 +168,7 @@ p < 0,001 para TF-IDF (p = 2,2·10⁻²⁶). El intervalo se calculó por bootst
 El coseno de TF-IDF nunca llega a 1 en documentos largos. Medido sobre **los 1.225
 pares posibles** (25 CVs × 49 ofertas del banco de calificación): mediana **0,025**,
 percentil 99 **0,058** y máximo **0,072**. Multiplicar por 100 dejaba al mejor par
-con **7,2/100**, hundiendo el puntaje global (la similitud pesa 0,40).
+con **7,2/100**, hundiendo el match (la similitud pesa 0,90 del match).
 
 **Solución:** cada motor define un techo (coseno = 100 puntos):
 
@@ -196,8 +196,8 @@ que son buenos y complete `puntaje_humano`.
 
 | Caso | Resultado |
 |---|---|
-| CV real de software (cv 5) vs oferta .NET (`par_005`) | global **49,3** · parseabilidad 100 · secciones 75 · similitud 38,9 |
-| CV real sin relación (cv 92) vs la misma oferta | global **35,4** · parseabilidad 100 · secciones 75 · similitud **4,1** |
+| CV real de software (cv 5) vs oferta .NET (`par_005`) | match **35,0** · ATS **87,5** · parseabilidad 100 · secciones 75 · similitud 38,9 |
+| CV real sin relación (cv 92) vs la misma oferta | match **3,7** · ATS **87,5** · parseabilidad 100 · secciones 75 · similitud **4,1** |
 | CV escaneado | rechazado con mensaje claro (sin OCR no hay diagnóstico) |
 
 Reproducir: `.venv/bin/python scripts/demo_diagnostico.py --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" --par par_005`.

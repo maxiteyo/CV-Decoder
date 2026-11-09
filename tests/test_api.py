@@ -126,6 +126,9 @@ def test_diagnostico_completo(client, tmp_path):
     cuerpo = respuesta.json()
 
     assert 0 <= cuerpo["puntaje_global"] <= 100
+    assert cuerpo["puntaje_global"] == cuerpo["puntaje_match"]
+    assert 0 <= cuerpo["puntaje_ats"] <= 100
+    assert cuerpo["nivel_match"] in {"bajo", "medio", "bueno", "muy bueno"}
     assert cuerpo["metadatos"]["archivo"] == "cv.pdf"
     assert cuerpo["metadatos"]["paginas"] >= 1
     assert cuerpo["metadatos"]["palabras"] >= 20
@@ -151,7 +154,7 @@ def test_diagnostico_completo(client, tmp_path):
     assert 0 <= similitud["crudo"] <= 1
     assert 0 <= similitud["puntaje"] <= 100
 
-    # El global tiene que ser la suma ponderada de las 4 dimensiones.
+    # El global es alias del match y debe respetar los pesos configurados.
     esperado = (
         PESOS_POR_DEFECTO["similitud"] * similitud["puntaje"]
         + PESOS_POR_DEFECTO["secciones"] * secciones["puntaje"]

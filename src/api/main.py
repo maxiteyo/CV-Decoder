@@ -104,7 +104,8 @@ app = FastAPI(
     version=VERSION,
     description=(
         "Diagnóstico automático de un CV en PDF contra una oferta laboral.\n\n"
-        "Devuelve un puntaje global (0-100) y cuatro dimensiones: "
+        "Devuelve dos puntajes (0-100): **puntaje_ats** (calidad del CV) y "
+        "**puntaje_match** (compatibilidad con la oferta), con el detalle de "
         "**parseabilidad**, **secciones**, **brecha de habilidades** y **similitud**.\n\n"
         "Probar desde `POST /api/v1/analyze-cv` → **Try it out**."
     ),
@@ -112,7 +113,7 @@ app = FastAPI(
     openapi_tags=[
         {
             "name": "Diagnóstico",
-            "description": "Analiza un CV contra una oferta y devuelve el JSON de 4 dimensiones.",
+            "description": "Analiza un CV contra una oferta y devuelve ATS, match y 4 dimensiones.",
         },
         {
             "name": "Sistema",
@@ -279,6 +280,9 @@ async def analyze_cv(
 
     respuesta = {
         "puntaje_global": resultado["puntaje_global"],
+        "puntaje_ats": resultado["puntaje_ats"],
+        "puntaje_match": resultado["puntaje_match"],
+        "nivel_match": resultado["nivel_match"],
         "metadatos": {
             "archivo": nombre,
             "paginas": len(leido["paginas"]),

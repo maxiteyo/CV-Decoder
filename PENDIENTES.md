@@ -42,11 +42,12 @@ Métricas de la bitácora §3 — **todas reproducidas**:
 | `main` local resuelta | ✅ rebase lineal sobre `origin/main`; conserva scripts de datos, `docs/metodologia-datos.md` y `lingua` |
 | Opcional — 10 pares buenos | ✅ `scripts/build_ceiling_pairs.py`; máximo coseno **0,1174** → techo **0,16** |
 | `TECHO_TFIDF` | ✅ `0.16` en `src/models/similarity.py` |
-| Tests | ✅ 16 de API (Maxi) + 4 de parseabilidad + 2 de diagnóstico = **22** |
+| Tests | ✅ 16 de API (Maxi) + 4 de parseabilidad + 3 de diagnóstico = **23** |
 | `requirements.txt` | ✅ fix `httpx2==2.16.0` → `2.14.0` + `httpx==0.28.1`; nota de Python 3.12 |
 | `.gitignore` | ✅ se volvió a ignorar `datos_para_maxi/` y `.zip` |
 | Docs | ✅ `README`, `docs/bitacora-proyecto.md`, `docs/etapa-b-resultados.md`, `docs/etapa-c-api.md`, `docs/guia-de-uso.md` con techo 0,16, Spearman 0,9521 y `--schema fine` |
 | Handoff | ✅ `README-MAXI.md` reescrito para la API oficial de Maxi |
+| Scoring Fase 1 | ✅ `puntaje_ats` y `puntaje_match` separados; `puntaje_global` queda como alias |
 
 > Ojo con el entrenamiento: el default de `train_ner.py` es `--schema coarse`
 > (6 etiquetas), pero `diagnostico.py` y las métricas usan el esquema **fine**

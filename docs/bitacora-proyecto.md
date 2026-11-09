@@ -20,15 +20,17 @@ o si el texto sale desordenado, el CV se descarta aunque la persona sea idónea.
 **CV-Decoder** recibe un CV en PDF y el texto de una oferta, y devuelve un JSON
 con un diagnóstico en 4 dimensiones:
 
-| # | Dimensión | Pregunta que responde | Peso |
+| # | Dimensión | Pregunta que responde | Aporta a |
 |---|---|---|---|
-| 1 | Parseabilidad | ¿Se puede leer el texto del PDF? | 0,15 |
-| 2 | Secciones | ¿Tiene Contacto, Experiencia, Educación y Habilidades? | 0,25 |
-| 3 | Brecha de habilidades | ¿Qué pide la oferta y no está en el CV? | 0,20 |
-| 4 | Similitud | ¿Qué tan parecido es el CV a la oferta? | 0,40 |
+| 1 | Parseabilidad | ¿Se puede leer el texto del PDF? | ATS (50%) |
+| 2 | Secciones | ¿Tiene Contacto, Experiencia, Educación y Habilidades? | ATS (50%) |
+| 3 | Brecha de habilidades | ¿Qué pide la oferta y no está en el CV? | Match (10%) |
+| 4 | Similitud | ¿Qué tan parecido es el CV a la oferta? | Match (90%) |
 
-El puntaje global (0–100) es una **suma ponderada** de esas cuatro dimensiones.
-No es una probabilidad ni una nota de "apto/no apto": es un diagnóstico relativo.
+El resultado expone **`puntaje_ats`** (calidad del CV como documento) y
+**`puntaje_match`** (compatibilidad con la oferta), ambos de 0 a 100.
+`puntaje_global` se conserva como alias de `puntaje_match`. No es una
+probabilidad ni una nota de "apto/no apto": es un diagnóstico relativo.
 
 **Alcance del MVP (lo que sí y lo que no):**
 
@@ -120,7 +122,7 @@ lenta del proyecto: leer dos documentos y decidir cuánto se parecen.
 
 **Primer resultado:** TF-IDF daba Spearman **0,803**. Cumplía el objetivo (≥ 0,75)
 pero quedaba margen de mejora. Además la escala estaba rota: el coseno máximo era
-0,072, así que el mejor par sacaba **7,2/100** y hundía el puntaje global.
+0,072, así que el mejor par sacaba **7,2/100** y hundía el match.
 
 ### Etapa B, parte 3 — Cierre con PDFs reales
 
@@ -342,8 +344,8 @@ API sin depender de los detalles internos.
   prueba, y las métricas de similitud se midieron en pares que no se usaron para
   construir nada.
 - **¿Qué significa el puntaje global?**
-  Es una suma ponderada de cuatro dimensiones, no una probabilidad. Sirve para
-  comparar y priorizar mejoras.
+  Es un alias de `puntaje_match`, la compatibilidad CV–oferta. El ATS se informa
+  aparte. Ninguno es una probabilidad; sirven para comparar y priorizar mejoras.
 - **¿Qué pasa con un CV en español?**
   El NER es inglés y TF-IDF no cruza idiomas. Los embeddings sí, pero ordenan
   mal. Es una limitación declarada; el lote real es inglés.
@@ -370,7 +372,7 @@ API sin depender de los detalles internos.
   comparar, asumiendo la primera carga (~35 s).
 - **¿Cómo se prueba la API?**
   `uvicorn src.api.main:app`, abrir `http://127.0.0.1:8000/docs` y usar "Try it
-  out"; o `python scripts/cliente_api.py`; o `python -m pytest -q` (22 pruebas).
+  out"; o `python scripts/cliente_api.py`; o `python -m pytest -q` (23 pruebas).
 
 ---
 
@@ -492,7 +494,7 @@ Para la API (el modelo ya tiene que estar entrenado):
 
 ```bash
 uvicorn src.api.main:app --reload    # en una terminal; abrir /docs
-python -m pytest -q                  # en otra; 22 pruebas
+python -m pytest -q                  # en otra; 23 pruebas
 ```
 
 Los PDFs reales y la planilla de pares calificados son datos del equipo: no están
@@ -531,8 +533,9 @@ secciones, similitud, calibración, mediciones y documentación) y Etapa C (API
 FastAPI, pruebas y guía de uso).
 
 **Siguiente:** preparar la defensa (presentación, demo y repaso de los números).
-La demo puede ser: levantar la API, mostrar `/docs`, diagnosticar un CV bueno
-(58,7), mostrar el rechazo de un escaneo (422) y correr las 22 pruebas.
+La demo puede ser: levantar la API, mostrar `/docs`, diagnosticar un CV real
+(35,0 de match y 87,5 de ATS), mostrar el rechazo de un escaneo (422) y correr
+las 23 pruebas.
 
 **Opcional — techo validado y recalibrado:** se armaron 10 pares nuevos del mismo
 oficio; el máximo coseno fue **0,1174**, así que el techo 0,10 saturaba. Se

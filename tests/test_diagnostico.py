@@ -25,6 +25,25 @@ OFERTA = (
     "communication skills to join our backend team."
 )
 
+CV_DOCENTE = (
+    "Laura Gomez\n"
+    "Biology Teacher\n"
+    "Email: laura.gomez@example.com\n"
+    "Work Experience\n"
+    "Biology Teacher, Colegio San Martin, 2019-2024. Planned lessons and taught science.\n"
+    "Education\n"
+    "Bachelor in Biology, 2018.\n"
+    "Skills\n"
+    "teaching, planning, communication.\n"
+)
+
+OFERTA_MOBILE = (
+    "We are seeking a Senior Quality Engineer in Mobile. "
+    "Requirements: 7+ years of mobile app automation, Espresso, XCUITest, "
+    "Java, Swift, Android, iOS, regression testing, CI and API testing. "
+    "Responsibilities: automate mobile tests and maintain test frameworks."
+)
+
 
 def test_analizar_devuelve_las_cuatro_dimensiones():
     resultado = analizar(CV, OFERTA, motor_similitud="tfidf")
@@ -43,3 +62,13 @@ def test_analizar_detecta_habilidades_compartidas():
 
     assert "java" in gap["coincidencias"]
     assert "java" not in gap["faltantes"]
+
+
+def test_separa_calidad_ats_de_compatibilidad():
+    resultado = analizar(CV_DOCENTE, OFERTA_MOBILE, motor_similitud="tfidf")
+
+    assert resultado["puntaje_global"] == resultado["puntaje_match"]
+    assert resultado["puntaje_ats"] >= 80
+    assert resultado["puntaje_match"] < 20
+    assert resultado["nivel_match"] == "bajo"
+    assert resultado["dimensiones"]["keyword_gap"]["faltantes"]

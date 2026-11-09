@@ -98,7 +98,7 @@ En concordancia con los lineamientos de la modalidad grupal, el esfuerzo inicial
 * **Extracción de Texto PDF:** `pdfminer.six` (texto, respeta mejor los espacios) + `pdfplumber` (páginas e imágenes para detectar escaneos)
 * **Procesamiento de Lenguaje Natural (NLP):** `spaCy` (modelo NER entrenado en **inglés**; el español se cubre con embeddings multilingües + diccionario bilingüe).
 * **Vectorización y Embeddings:** `scikit-learn` (TF-IDF, motor oficial) y `sentence-transformers` (Modelo: `paraphrase-multilingual-mpnet-base-v2`, evaluado y descartado para el ordenamiento).
-* **Puntuación / Scoring:** reglas ponderadas: similitud 0,40 · secciones 0,25 · brecha de habilidades 0,20 · parseabilidad 0,15. No se usa un clasificador entrenado porque no existen etiquetas de verdad para el score final.
+* **Puntuación / Scoring:** dos puntajes independientes: **ATS** = 50% parseabilidad + 50% secciones; **match** = 90% similitud + 10% brecha de habilidades. `puntaje_global` queda como alias de match. No se usa un clasificador entrenado porque no existen etiquetas de verdad para el score final.
 * **Servicio y API REST:** `FastAPI`, `pydantic`, `uvicorn` y `python-multipart`
 
 ---

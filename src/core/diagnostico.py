@@ -1,10 +1,18 @@
-"""Motor de diagnóstico: combina las 4 dimensiones en un solo resultado.
+"""Motor de diagnóstico: separa calidad del CV (ATS) y compatibilidad.
 
 Dimensiones:
   1. Parseabilidad  : ¿se puede leer el texto del PDF?
   2. Secciones       : ¿tiene Contacto, Experiencia, Educación y Habilidades?
   3. Brecha de skills: ¿qué habilidades pide la oferta y no están en el CV?
   4. Similitud       : ¿qué tan parecido es el CV a la oferta?
+
+El resultado expone dos puntajes independientes:
+
+  - ``puntaje_ats``   : qué tan bien armado está el CV como documento.
+  - ``puntaje_match`` : qué tan bien se adecúa a la oferta.
+
+``puntaje_global`` se conserva como alias de ``puntaje_match`` para no romper la
+API existente. El ATS no se suma al match: un CV puede ser 100 ATS y 10 match.
 """
 
 from __future__ import annotations
@@ -48,12 +56,38 @@ SECCION_ENCABEZADOS = {
 }
 MAX_LARGO_ENCABEZADO = 60
 
-PESOS_POR_DEFECTO = {
-    "similitud": 0.40,
-    "secciones": 0.25,
-    "keyword_gap": 0.20,
-    "parseabilidad": 0.15,
+# Pesos del match: la similitud manda y la brecha de skills aporta, pero la
+# calidad del CV (parseabilidad y secciones) no infla la compatibilidad.
+PESOS_MATCH = {
+    "similitud": 0.90,
+    "keyword_gap": 0.10,
+    "secciones": 0.0,
+    "parseabilidad": 0.0,
 }
+
+# Alias histórico: la API y los tests existentes importan este nombre.
+PESOS_POR_DEFECTO = PESOS_MATCH
+
+# El ATS es una dimensión aparte: mide el CV como documento, no contra la oferta.
+PESOS_ATS = {
+    "parseabilidad": 0.50,
+    "secciones": 0.50,
+}
+
+NIVEL_MATCH_BAJO = 20.0
+NIVEL_MATCH_BUENO = 50.0
+NIVEL_MATCH_MUY_BUENO = 75.0
+
+
+def nivel_match(puntaje: float) -> str:
+    """Etiqueta cualitativa del match (cortes provisorios de la Fase 1)."""
+    if puntaje < NIVEL_MATCH_BAJO:
+        return "bajo"
+    if puntaje < NIVEL_MATCH_BUENO:
+        return "medio"
+    if puntaje < NIVEL_MATCH_MUY_BUENO:
+        return "bueno"
+    return "muy bueno"
 
 
 def _entidades_de_doc(doc) -> list[dict]:
@@ -162,7 +196,11 @@ def analizar(
     motor_similitud: str = "tfidf",
     pesos: dict[str, float] | None = None,
 ) -> dict:
-    """Devuelve el diagnóstico completo de un CV contra una oferta."""
+    """Devuelve el diagnóstico completo de un CV contra una oferta.
+
+    ``pesos`` controla la fórmula del match (no la del ATS). El valor por
+    defecto usa 90% similitud + 10% brecha de skills.
+    """
     pesos = pesos or PESOS_POR_DEFECTO
     nlp = get_nlp()
 
@@ -185,16 +223,26 @@ def analizar(
     dim_gap = round(100 * cobertura, 1)
     dim_similitud = modelo.puntaje(similitud_valor)
 
-    puntaje_global = round(
+    puntaje_ats = round(
+        PESOS_ATS["parseabilidad"] * dim_parseabilidad
+        + PESOS_ATS["secciones"] * dim_secciones,
+        1,
+    )
+    puntaje_match = round(
         pesos["similitud"] * dim_similitud
-        + pesos["secciones"] * dim_secciones
         + pesos["keyword_gap"] * dim_gap
+        + pesos["secciones"] * dim_secciones
         + pesos["parseabilidad"] * dim_parseabilidad,
         1,
     )
+    # Alias de compatibilidad: la API existente sigue leyendo puntaje_global.
+    puntaje_global = puntaje_match
 
     return {
         "puntaje_global": puntaje_global,
+        "puntaje_ats": puntaje_ats,
+        "puntaje_match": puntaje_match,
+        "nivel_match": nivel_match(puntaje_match),
         "dimensiones": {
             "parseabilidad": {"puntaje": dim_parseabilidad},
             "secciones": {

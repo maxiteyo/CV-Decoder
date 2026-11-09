@@ -22,7 +22,7 @@ PDF del CV  +  texto de la oferta
    POST /api/v1/analyze-cv
         │
         ▼
-   JSON con puntaje global (0–100) y 4 dimensiones
+   JSON con ATS, match (0–100) y 4 dimensiones
 ```
 
 Ventajas concretas para la demo y para el equipo:
@@ -140,13 +140,16 @@ Abajo aparecen tres cosas:
 ### 3.1 Cómo leer la respuesta
 
 > El JSON de abajo es de un par distinto (`par_005`). Con la oferta de ejemplo de
-> arriba el global da **54,6** (similitud 35,5; brecha 33,3), porque todo depende
-> de la oferta que se pegue. Lo importante es la estructura, no memorizar el
-> número.
+> arriba el match da **35,3** (similitud 35,5; brecha 33,3) y el ATS **87,5**,
+> porque todo depende de la oferta que se pegue. Lo importante es la estructura,
+> no memorizar el número.
 
 ```json
 {
-  "puntaje_global": 58.7,
+  "puntaje_global": 35.0,
+  "puntaje_ats": 87.5,
+  "puntaje_match": 35.0,
+  "nivel_match": "medio",
   "metadatos": {
     "archivo": "cv (5).pdf",
     "paginas": 1,
@@ -173,14 +176,17 @@ Abajo aparecen tres cosas:
       "total_oferta": 9,
       "total_cv": 8
     },
-    "similitud": { "puntaje": 62.3, "motor": "tfidf", "crudo": 0.0623 }
+    "similitud": { "puntaje": 38.9, "motor": "tfidf", "crudo": 0.0623 }
   }
 }
 ```
 
 | Campo | Qué significa |
 |---|---|
-| `puntaje_global` | Suma ponderada de las 4 dimensiones (0–100). **No** es una probabilidad ni un "apto/no apto". |
+| `puntaje_global` | Alias de `puntaje_match` por compatibilidad (0–100). **No** es una probabilidad ni un "apto/no apto". |
+| `puntaje_ats` | Calidad del CV como documento: 50% parseabilidad + 50% secciones. |
+| `puntaje_match` | Compatibilidad con la oferta: 90% similitud + 10% brecha de habilidades. |
+| `nivel_match` | Etiqueta cualitativa: bajo, medio, bueno o muy bueno. |
 | `metadatos.paginas` | Páginas con estructura legible que encontró el lector. |
 | `metadatos.palabras` | Palabras de texto extraídas del PDF. |
 | `metadatos.tiempo_ms` | Lo que tardó el procesamiento: lectura del PDF + NLP, en milisegundos. |
@@ -193,8 +199,10 @@ Abajo aparecen tres cosas:
 | `similitud.puntaje` | Parecido CV–oferta en escala 0–100 (calibrada). |
 | `similitud.crudo` | Coseno TF-IDF sin calibrar (0–1), para auditoría. |
 
-Los pesos del puntaje global son los mismos de todo el proyecto:
-**similitud 0,40 · secciones 0,25 · brecha de habilidades 0,20 · parseabilidad 0,15**.
+Los puntajes se calculan por separado:
+**ATS = 50% parseabilidad + 50% secciones**;
+**match = 90% similitud + 10% brecha de habilidades**.
+`puntaje_global` es un alias de `puntaje_match`.
 
 ### 3.2 Probar los errores desde Swagger
 
@@ -396,14 +404,14 @@ Se suman `tests/test_quality.py` (4 pruebas de parseabilidad) y
 .venv/bin/python -m pytest -v       # nombre por nombre
 ```
 
-Resultado: **22 passed** en ~30 s (el modelo se carga una vez).
+Resultado: **23 passed** en ~30 s (el modelo se carga una vez).
 
 Qué cubren:
 
 | Grupo | Pruebas |
 |---|---|
 | Sistema | `/health`, `/`, `/openapi.json`. |
-| Camino feliz | Diagnóstico completo, rangos 0–100, las 4 secciones, coincidencias y faltantes de habilidades, suma ponderada del global, metadatos. |
+| Camino feliz | Diagnóstico completo, rangos 0–100, las 4 secciones, coincidencias y faltantes de habilidades, ATS y match separados, metadatos. |
 | Privacidad | Que no queden archivos `cv_decoder_*.pdf` en el temporal después del pedido. |
 | Errores | `.txt`, PDF falso, archivo vacío, PDF roto, PDF escaneado, oferta corta, oferta larga, PDF > 5 MB, falta de oferta, motor inválido. |
 
@@ -461,11 +469,11 @@ con el texto ya extraído tarda 0,05–0,20 s.
 2. Esperar `Modelos cargados y calentados` y abrir `/docs`.
 3. Mostrar `GET /health` → `estado: ok`.
 4. `POST /api/v1/analyze-cv` con un CV bueno + oferta → mostrar el JSON y el
-   puntaje global (ejemplo medido con `par_005`: **58,7**, similitud 62,3).
+   match (ejemplo medido con `par_005`: **35,0**, ATS 87,5, similitud 38,9).
 5. Subir el CV escaneado → mostrar el **422** con `PDF_SIN_TEXTO` y la sugerencia.
 6. Poner una oferta de dos palabras → mostrar **422** `OFERTA_MUY_CORTA`.
 7. Mostrar la pestaña **Schemas** de Swagger: el contrato es público.
-8. Cerrar con `.venv/bin/python -m pytest -q` → **22 passed**.
+8. Cerrar con `.venv/bin/python -m pytest -q` → **23 passed**.
 9. (Opcional) Mostrar `scripts/cliente_api.py` para probar sin navegador.
 
 Frase para el jurado: *"La API no guarda el CV, no requiere login y rechaza con

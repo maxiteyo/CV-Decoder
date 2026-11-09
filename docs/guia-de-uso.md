@@ -38,18 +38,26 @@ CV-Decoder recibe dos cosas:
 - un **CV en formato PDF**;
 - el **texto de una oferta laboral**.
 
-Y devuelve un **JSON** con un puntaje global de 0 a 100 y el detalle de cuatro
+Y devuelve un **JSON** con dos puntajes de 0 a 100 y el detalle de cuatro
 dimensiones:
 
-| Dimensión | Peso | Qué mide |
+| Puntaje | Fórmula | Qué mide |
 |---|---:|---|
-| Similitud CV–oferta | 40 % | Qué tanto se parecen los textos (motor TF-IDF). |
-| Completitud de secciones | 25 % | Si están Contacto, Experiencia, Educación y Habilidades. |
-| Brecha de palabras clave | 20 % | Qué términos pide la oferta y no aparecen en el CV. |
-| Parseabilidad | 15 % | Si el PDF tiene texto legible o es un escaneo. |
+| `puntaje_ats` | 50% parseabilidad + 50% secciones | Calidad del CV como documento. |
+| `puntaje_match` | 90% similitud + 10% brecha | Compatibilidad con la oferta. |
 
-El puntaje global es una **suma ponderada** de esas cuatro dimensiones. No es una
-probabilidad ni una nota oficial: sirve para **comparar y priorizar mejoras**.
+`puntaje_global` se conserva como alias de `puntaje_match` para no romper
+clientes viejos. Ninguno es una probabilidad ni una nota oficial: sirven para
+**comparar y priorizar mejoras**.
+
+Las cuatro dimensiones son:
+
+| Dimensión | Qué mide |
+|---|---|
+| Similitud CV–oferta | Qué tanto se parecen los textos (motor TF-IDF). |
+| Completitud de secciones | Si están Contacto, Experiencia, Educación y Habilidades. |
+| Brecha de palabras clave | Qué términos pide la oferta y no aparecen en el CV. |
+| Parseabilidad | Si el PDF tiene texto legible o es un escaneo. |
 
 El flujo completo es:
 
@@ -60,7 +68,7 @@ PDF del CV  +  texto de la oferta
  POST /api/v1/analyze-cv
         │
         ▼
- JSON con puntaje global y las 4 dimensiones
+ JSON con ATS, match y las 4 dimensiones
 ```
 
 La API **no guarda nada**: el PDF se escribe en un archivo temporal, se procesa y
@@ -162,7 +170,10 @@ del Apéndice A, el resultado esperado es aproximadamente:
 
 | Campo | Valor |
 |---|---:|
-| `puntaje_global` | 96,7 |
+| `puntaje_global` | 98,3 (alias de match) |
+| `puntaje_ats` | 100,0 |
+| `puntaje_match` | 98,3 |
+| `nivel_match` | muy bueno |
 | Parseabilidad | 100,0 |
 | Secciones | 100,0 (las cuatro presentes) |
 | Brecha de palabras clave | 83,3 (falta `project management`) |
@@ -173,7 +184,10 @@ Con un CV real los números suelen ser más bajos. Por ejemplo, con el archivo
 
 | Campo | Valor |
 |---|---:|
-| `puntaje_global` | 54,6 |
+| `puntaje_global` | 35,3 (alias de match) |
+| `puntaje_ats` | 87,5 |
+| `puntaje_match` | 35,3 |
+| `nivel_match` | medio |
 | Parseabilidad | 100,0 |
 | Secciones | 75,0 (falta Contacto) |
 | Brecha de palabras clave | 33,3 (coinciden `excel` y `python`) |
@@ -269,10 +283,10 @@ Resultado esperado:
 
 ```text
 ......................                                                   [100%]
-22 passed in 30.00s
+23 passed in 30.00s
 ```
 
-Son **22 pruebas**: 16 de la API (generan sus propios PDFs legibles, escaneados y
+Son **23 pruebas**: 16 de la API (generan sus propios PDFs legibles, escaneados y
 rotos con `fpdf2` y `Pillow`) + 4 de parseabilidad + 2 del motor de diagnóstico.
 No dependen de `data/`. La primera corrida tarda unos 30 segundos por la carga
 del modelo; las siguientes son más rápidas.
@@ -537,7 +551,7 @@ curl -s http://127.0.0.1:8000/health
 .venv/bin/python -m pytest -q
 ```
 
-Resultado esperado: `estado: "ok"` y **22 pruebas en verde**. Después seguí desde
+Resultado esperado: `estado: "ok"` y **23 pruebas en verde**. Después seguí desde
 [A.4](#a4-probar-desde-el-navegador-swagger) para probar el diagnóstico.
 
 ---
@@ -548,7 +562,10 @@ La respuesta completa tiene esta forma (valores abreviados):
 
 ```json
 {
-  "puntaje_global": 54.6,
+  "puntaje_global": 35.3,
+  "puntaje_ats": 87.5,
+  "puntaje_match": 35.3,
+  "nivel_match": "medio",
   "metadatos": {
     "archivo": "cv (5).pdf",
     "paginas": 1,
@@ -588,9 +605,13 @@ La respuesta completa tiene esta forma (valores abreviados):
 
 Cómo interpretarlo:
 
-- **`puntaje_global`**: suma ponderada de las cuatro dimensiones. Un CV con texto
-  legible, las cuatro secciones y buena coincidencia de palabras clave sube
-  rápido; un escaneo directamente se rechaza.
+- **`puntaje_ats`**: calidad del CV como documento (parseabilidad + secciones).
+  Un CV legible y completo saca un ATS alto aunque no tenga nada que ver con la
+  oferta.
+- **`puntaje_match`**: compatibilidad real con la oferta (90% similitud + 10%
+  brecha de palabras clave). Es el número que conviene mirar para decidir si el
+  CV se acerca al puesto.
+- **`puntaje_global`**: alias de `puntaje_match`, mantenido por compatibilidad.
 - **`parseabilidad`**: 100 significa que el PDF tiene texto usable. Si es un
   escaneo, la API responde 422 y no devuelve un puntaje de 0.
 - **`secciones`**: porcentaje de las cuatro secciones presentes. Cada sección
@@ -758,7 +779,7 @@ permite:
 | Entrenar el NER | **Sí** | DataTurks + los dos repos de referencia. |
 | F1 de secciones ≈ 0,95 | **Sí** | El conjunto de prueba sale de DataTurks; puede variar unas centésimas. |
 | Parseabilidad sintética 60/60 | **Sí** | Los PDFs se generan con `fpdf2` y `Pillow`. |
-| Las 22 pruebas (API + núcleo) | **Sí** | Generan sus propios PDFs; sólo necesitan el modelo. |
+| Las 23 pruebas (API + núcleo) | **Sí** | Generan sus propios PDFs; sólo necesitan el modelo. |
 | Parseabilidad real 210/210 | **No** | Requiere los 221 PDFs del equipo y sus etiquetas. |
 | Spearman 0,9521 | **No** | Requiere las 50 calificaciones humanas del equipo. |
 | Tiempos de respuesta exactos | **No** | Dependen del hardware. El orden de magnitud sí se reproduce. |
@@ -780,7 +801,7 @@ personas reales). El código y los scripts para procesarlos sí están versionad
 | `docs/etapa-c-api.md` | API: endpoints, contrato, errores, pruebas y demo. |
 | `docs/bitacora-proyecto.md` | Recorrido, decisiones, preguntas del jurado y estado. |
 | `src/api/main.py` | Endpoint, validaciones, errores y calentamiento. |
-| `src/core/diagnostico.py` | Motor que combina las cuatro dimensiones. |
+| `src/core/diagnostico.py` | Motor que calcula ATS y match desde las cuatro dimensiones. |
 | `src/parsing/pdf_reader.py` | Lectura del PDF (texto + estructura). |
 | `src/models/similarity.py` | TF-IDF, embeddings y calibración. |
 | `scripts/build_ner_dataset.py` | Limpieza y splits del dataset de entidades. |
@@ -867,8 +888,8 @@ PY
 
 Después subilo desde Swagger con la oferta de ejemplo de
 [A.4](#a4-probar-desde-el-navegador-swagger). El resultado esperado es
-**96,7** (las cuatro secciones, similitud 100 y sólo falta `project management`
-en la brecha de palabras clave).
+**98,3 de match y 100 de ATS** (las cuatro secciones, similitud 100 y sólo falta
+`project management` en la brecha de palabras clave).
 
 ---
 

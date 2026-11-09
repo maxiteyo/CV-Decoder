@@ -13,7 +13,10 @@ from pydantic import BaseModel, ConfigDict, Field
 MotorSimilitud = Literal["tfidf", "embeddings", "embeddings_fragmentos"]
 
 EJEMPLO_RESPUESTA = {
-    "puntaje_global": 58.7,
+    "puntaje_global": 35.0,
+    "puntaje_ats": 87.5,
+    "puntaje_match": 35.0,
+    "nivel_match": "medio",
     "metadatos": {
         "archivo": "cv.pdf",
         "paginas": 1,
@@ -40,7 +43,7 @@ EJEMPLO_RESPUESTA = {
             "total_oferta": 9,
             "total_cv": 0,
         },
-        "similitud": {"puntaje": 62.3, "motor": "tfidf", "crudo": 0.0623},
+        "similitud": {"puntaje": 38.9, "motor": "tfidf", "crudo": 0.0623},
     },
 }
 
@@ -104,7 +107,20 @@ class DiagnosticoOut(BaseModel):
     puntaje_global: float = Field(
         ge=0,
         le=100,
-        description="Suma ponderada: similitud 0,40 · secciones 0,25 · brecha 0,20 · parseabilidad 0,15",
+        description="Alias de puntaje_match (compatibilidad CV-oferta)",
+    )
+    puntaje_ats: float = Field(
+        ge=0,
+        le=100,
+        description="Calidad del CV como documento: parseabilidad + secciones",
+    )
+    puntaje_match: float = Field(
+        ge=0,
+        le=100,
+        description="Compatibilidad CV-oferta: 90% similitud + 10% brecha de skills",
+    )
+    nivel_match: Literal["bajo", "medio", "bueno", "muy bueno"] = Field(
+        description="Etiqueta cualitativa de puntaje_match"
     )
     metadatos: MetadatosOut
     dimensiones: DimensionesOut
