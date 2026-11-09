@@ -372,7 +372,7 @@ API sin depender de los detalles internos.
   comparar, asumiendo la primera carga (~35 s).
 - **¿Cómo se prueba la API?**
   `uvicorn src.api.main:app`, abrir `http://127.0.0.1:8000/docs` y usar "Try it
-  out"; o `python scripts/cliente_api.py`; o `python -m pytest -q` (23 pruebas).
+  out"; o `python scripts/cliente_api.py`; o `python -m pytest -q` (28 pruebas).
 
 ---
 
@@ -494,7 +494,7 @@ Para la API (el modelo ya tiene que estar entrenado):
 
 ```bash
 uvicorn src.api.main:app --reload    # en una terminal; abrir /docs
-python -m pytest -q                  # en otra; 23 pruebas
+python -m pytest -q                  # en otra; 28 pruebas
 ```
 
 Los PDFs reales y la planilla de pares calificados son datos del equipo: no están
@@ -534,8 +534,8 @@ FastAPI, pruebas y guía de uso).
 
 **Siguiente:** preparar la defensa (presentación, demo y repaso de los números).
 La demo puede ser: levantar la API, mostrar `/docs`, diagnosticar un CV real
-(35,0 de match y 87,5 de ATS), mostrar el rechazo de un escaneo (422) y correr
-las 23 pruebas.
+(25,0 de match y 87,5 de ATS), mostrar el rechazo de un escaneo (422) y correr
+las 28 pruebas.
 
 **Opcional — techo validado y recalibrado:** se armaron 10 pares nuevos del mismo
 oficio; el máximo coseno fue **0,1174**, así que el techo 0,10 saturaba. Se

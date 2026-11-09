@@ -44,7 +44,7 @@ dimensiones:
 | Puntaje | Fórmula | Qué mide |
 |---|---:|---|
 | `puntaje_ats` | 50% parseabilidad + 50% secciones | Calidad del CV como documento. |
-| `puntaje_match` | 90% similitud + 10% brecha | Compatibilidad con la oferta. |
+| `puntaje_match` | 90% similitud + 10% brecha ponderada | Compatibilidad con la oferta; se topa si faltan requisitos centrales. |
 
 `puntaje_global` se conserva como alias de `puntaje_match` para no romper
 clientes viejos. Ninguno es una probabilidad ni una nota oficial: sirven para
@@ -184,14 +184,14 @@ Con un CV real los números suelen ser más bajos. Por ejemplo, con el archivo
 
 | Campo | Valor |
 |---|---:|
-| `puntaje_global` | 35,3 (alias de match) |
+| `puntaje_global` | 23,3 (alias de match) |
 | `puntaje_ats` | 87,5 |
-| `puntaje_match` | 35,3 |
+| `puntaje_match` | 23,3 |
 | `nivel_match` | medio |
 | Parseabilidad | 100,0 |
 | Secciones | 75,0 (falta Contacto) |
 | Brecha de palabras clave | 33,3 (coinciden `excel` y `python`) |
-| Similitud | 35,5 |
+| Similitud | 22,2 |
 
 > Los valores exactos pueden variar unas décimas según la versión de las
 > librerías. Lo importante es la estructura del JSON y la interpretación.
@@ -283,11 +283,11 @@ Resultado esperado:
 
 ```text
 ......................                                                   [100%]
-23 passed in 30.00s
+28 passed in 30.00s
 ```
 
-Son **23 pruebas**: 16 de la API (generan sus propios PDFs legibles, escaneados y
-rotos con `fpdf2` y `Pillow`) + 4 de parseabilidad + 2 del motor de diagnóstico.
+Son **28 pruebas**: 16 de la API (generan sus propios PDFs legibles, escaneados y
+rotos con `fpdf2` y `Pillow`) + 4 de parseabilidad + 8 del motor de diagnóstico.
 No dependen de `data/`. La primera corrida tarda unos 30 segundos por la carga
 del modelo; las siguientes son más rápidas.
 
@@ -551,7 +551,7 @@ curl -s http://127.0.0.1:8000/health
 .venv/bin/python -m pytest -q
 ```
 
-Resultado esperado: `estado: "ok"` y **23 pruebas en verde**. Después seguí desde
+Resultado esperado: `estado: "ok"` y **28 pruebas en verde**. Después seguí desde
 [A.4](#a4-probar-desde-el-navegador-swagger) para probar el diagnóstico.
 
 ---
@@ -562,10 +562,21 @@ La respuesta completa tiene esta forma (valores abreviados):
 
 ```json
 {
-  "puntaje_global": 35.3,
+  "puntaje_global": 23.3,
   "puntaje_ats": 87.5,
-  "puntaje_match": 35.3,
+  "puntaje_match": 23.3,
   "nivel_match": "medio",
+  "requisitos": {
+    "obligatorios_cumplidos": ["excel", "python"],
+    "obligatorios_faltantes": ["dashboards", "docker", "project management", "sql"],
+    "deseables_cumplidos": [],
+    "deseables_faltantes": [],
+    "cobertura_obligatorios": 33.3,
+    "cobertura_total": 33.3,
+    "cap_match": 50.0,
+    "secciones_detectadas": ["texto_completo"],
+    "confianza": "baja"
+  },
   "metadatos": {
     "archivo": "cv (5).pdf",
     "paginas": 1,
@@ -595,7 +606,7 @@ La respuesta completa tiene esta forma (valores abreviados):
       "total_cv": 8
     },
     "similitud": {
-      "puntaje": 35.5,
+      "puntaje": 22.2,
       "motor": "tfidf",
       "crudo": 0.0355
     }
@@ -609,8 +620,11 @@ Cómo interpretarlo:
   Un CV legible y completo saca un ATS alto aunque no tenga nada que ver con la
   oferta.
 - **`puntaje_match`**: compatibilidad real con la oferta (90% similitud + 10%
-  brecha de palabras clave). Es el número que conviene mirar para decidir si el
-  CV se acerca al puesto.
+  brecha ponderada). Si falta lo central, se aplica un tope de 25 o 50. Es el
+  número que conviene mirar para decidir si el CV se acerca al puesto.
+- **`requisitos`**: separa obligatorios de deseables y muestra el `cap_match`
+  aplicado. `confianza` baja significa que la oferta no tenía secciones claras y
+  se usó todo el texto.
 - **`puntaje_global`**: alias de `puntaje_match`, mantenido por compatibilidad.
 - **`parseabilidad`**: 100 significa que el PDF tiene texto usable. Si es un
   escaneo, la API responde 422 y no devuelve un puntaje de 0.
@@ -779,7 +793,7 @@ permite:
 | Entrenar el NER | **Sí** | DataTurks + los dos repos de referencia. |
 | F1 de secciones ≈ 0,95 | **Sí** | El conjunto de prueba sale de DataTurks; puede variar unas centésimas. |
 | Parseabilidad sintética 60/60 | **Sí** | Los PDFs se generan con `fpdf2` y `Pillow`. |
-| Las 23 pruebas (API + núcleo) | **Sí** | Generan sus propios PDFs; sólo necesitan el modelo. |
+| Las 28 pruebas (API + núcleo) | **Sí** | Generan sus propios PDFs; sólo necesitan el modelo. |
 | Parseabilidad real 210/210 | **No** | Requiere los 221 PDFs del equipo y sus etiquetas. |
 | Spearman 0,9521 | **No** | Requiere las 50 calificaciones humanas del equipo. |
 | Tiempos de respuesta exactos | **No** | Dependen del hardware. El orden de magnitud sí se reproduce. |

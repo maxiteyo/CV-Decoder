@@ -140,16 +140,27 @@ Abajo aparecen tres cosas:
 ### 3.1 Cómo leer la respuesta
 
 > El JSON de abajo es de un par distinto (`par_005`). Con la oferta de ejemplo de
-> arriba el match da **35,3** (similitud 35,5; brecha 33,3) y el ATS **87,5**,
+> arriba el match da **23,3** (similitud 22,2; brecha 33,3) y el ATS **87,5**,
 > porque todo depende de la oferta que se pegue. Lo importante es la estructura,
 > no memorizar el número.
 
 ```json
 {
-  "puntaje_global": 35.0,
+  "puntaje_global": 25.0,
   "puntaje_ats": 87.5,
-  "puntaje_match": 35.0,
+  "puntaje_match": 25.0,
   "nivel_match": "medio",
+  "requisitos": {
+    "obligatorios_cumplidos": [],
+    "obligatorios_faltantes": [".net", "asp.net", "database design", "oop", "problem-solving"],
+    "deseables_cumplidos": [],
+    "deseables_faltantes": [],
+    "cobertura_obligatorios": 0.0,
+    "cobertura_total": 0.0,
+    "cap_match": 25.0,
+    "secciones_detectadas": ["responsabilidades", "requisitos"],
+    "confianza": "alta"
+  },
   "metadatos": {
     "archivo": "cv (5).pdf",
     "paginas": 1,
@@ -172,8 +183,8 @@ Abajo aparecen tres cosas:
     "keyword_gap": {
       "puntaje": 0.0,
       "coincidencias": [],
-      "faltantes": [".net", "agile", "asp.net", "design"],
-      "total_oferta": 9,
+      "faltantes": [".net", "asp.net", "database design", "oop", "problem-solving"],
+      "total_oferta": 5,
       "total_cv": 8
     },
     "similitud": { "puntaje": 38.9, "motor": "tfidf", "crudo": 0.0623 }
@@ -187,6 +198,8 @@ Abajo aparecen tres cosas:
 | `puntaje_ats` | Calidad del CV como documento: 50% parseabilidad + 50% secciones. |
 | `puntaje_match` | Compatibilidad con la oferta: 90% similitud + 10% brecha de habilidades. |
 | `nivel_match` | Etiqueta cualitativa: bajo, medio, bueno o muy bueno. |
+| `requisitos` | Requisitos obligatorios/deseables, cobertura y cap aplicado. |
+| `requisitos.cap_match` | Tope del match si falta lo central: 25 (<30% de obligatorios) o 50 (<50%). |
 | `metadatos.paginas` | Páginas con estructura legible que encontró el lector. |
 | `metadatos.palabras` | Palabras de texto extraídas del PDF. |
 | `metadatos.tiempo_ms` | Lo que tardó el procesamiento: lectura del PDF + NLP, en milisegundos. |
@@ -195,14 +208,15 @@ Abajo aparecen tres cosas:
 | `secciones.faltantes` | Las que no se detectaron (candidatas a agregar en el CV). |
 | `keyword_gap.coincidencias` | Habilidades que pide la oferta **y** están en el CV. |
 | `keyword_gap.faltantes` | Habilidades que pide la oferta y **no** están en el CV. |
-| `keyword_gap.puntaje` | Porcentaje de habilidades de la oferta cubiertas por el CV. |
+| `keyword_gap.puntaje` | Cobertura ponderada de requisitos (obligatorios 100%, deseables 40%). |
 | `similitud.puntaje` | Parecido CV–oferta en escala 0–100 (calibrada). |
 | `similitud.crudo` | Coseno TF-IDF sin calibrar (0–1), para auditoría. |
 
 Los puntajes se calculan por separado:
 **ATS = 50% parseabilidad + 50% secciones**;
-**match = 90% similitud + 10% brecha de habilidades**.
-`puntaje_global` es un alias de `puntaje_match`.
+**match = 90% similitud + 10% brecha ponderada de requisitos**.
+Si la cobertura de obligatorios es menor al 30%, el match se topa en 25; si es
+menor al 50%, en 50. `puntaje_global` es un alias de `puntaje_match`.
 
 ### 3.2 Probar los errores desde Swagger
 
@@ -397,21 +411,21 @@ OCR está fuera del alcance.
 Archivo: `tests/test_api.py` (16 pruebas). Generan sus propios PDFs al vuelo con
 `fpdf2` y `Pillow`, así que **no dependen de `data/`** (que no se versiona).
 Se suman `tests/test_quality.py` (4 pruebas de parseabilidad) y
-`tests/test_diagnostico.py` (2 pruebas del motor): **22 en total**.
+`tests/test_diagnostico.py` (8 pruebas del motor): **28 en total**.
 
 ```bash
 .venv/bin/python -m pytest -q       # resumen
 .venv/bin/python -m pytest -v       # nombre por nombre
 ```
 
-Resultado: **23 passed** en ~30 s (el modelo se carga una vez).
+Resultado: **28 passed** en ~30 s (el modelo se carga una vez).
 
 Qué cubren:
 
 | Grupo | Pruebas |
 |---|---|
 | Sistema | `/health`, `/`, `/openapi.json`. |
-| Camino feliz | Diagnóstico completo, rangos 0–100, las 4 secciones, coincidencias y faltantes de habilidades, ATS y match separados, metadatos. |
+| Camino feliz | Diagnóstico completo, rangos 0–100, las 4 secciones, requisitos obligatorios/deseables, gate, ATS y match separados, metadatos. |
 | Privacidad | Que no queden archivos `cv_decoder_*.pdf` en el temporal después del pedido. |
 | Errores | `.txt`, PDF falso, archivo vacío, PDF roto, PDF escaneado, oferta corta, oferta larga, PDF > 5 MB, falta de oferta, motor inválido. |
 
@@ -469,11 +483,11 @@ con el texto ya extraído tarda 0,05–0,20 s.
 2. Esperar `Modelos cargados y calentados` y abrir `/docs`.
 3. Mostrar `GET /health` → `estado: ok`.
 4. `POST /api/v1/analyze-cv` con un CV bueno + oferta → mostrar el JSON y el
-   match (ejemplo medido con `par_005`: **35,0**, ATS 87,5, similitud 38,9).
+   match (ejemplo medido con `par_005`: **25,0**, ATS 87,5, similitud 38,9).
 5. Subir el CV escaneado → mostrar el **422** con `PDF_SIN_TEXTO` y la sugerencia.
 6. Poner una oferta de dos palabras → mostrar **422** `OFERTA_MUY_CORTA`.
 7. Mostrar la pestaña **Schemas** de Swagger: el contrato es público.
-8. Cerrar con `.venv/bin/python -m pytest -q` → **23 passed**.
+8. Cerrar con `.venv/bin/python -m pytest -q` → **28 passed**.
 9. (Opcional) Mostrar `scripts/cliente_api.py` para probar sin navegador.
 
 Frase para el jurado: *"La API no guarda el CV, no requiere login y rechaza con

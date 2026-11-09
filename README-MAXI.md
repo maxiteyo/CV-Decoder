@@ -100,7 +100,7 @@ etiquetas) y el motor de diagnóstico usa el esquema fino (10 etiquetas).
 
 ```bash
 python -m pytest -q
-# esperado: 23 passed (16 de API + 4 de parseabilidad + 3 de diagnóstico)
+# esperado: 28 passed (16 de API + 4 de parseabilidad + 8 de diagnóstico)
 
 uvicorn src.api.main:app --reload
 # Swagger: http://127.0.0.1:8000/docs

@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 
 from src import config
-from src.core.diagnostico import analizar
+from src.core.diagnostico import (
+    analizar,
+    cap_por_requisitos,
+    normalizar_habilidad,
+    segmentar_oferta,
+)
 
 pytestmark = pytest.mark.skipif(
     not (config.MODELS_DIR / "ner_dataturks_sm").exists(),
@@ -44,6 +49,46 @@ OFERTA_MOBILE = (
     "Responsibilities: automate mobile tests and maintain test frameworks."
 )
 
+CV_ARQUITECTO = (
+    "Carlos Rossi\n"
+    "Project Architect\n"
+    "Email: carlos.rossi@example.com\n"
+    "Work Experience\n"
+    "Senior Project Architect, design and BIM with Revit, 2018-2024.\n"
+    "Education\n"
+    "Bachelor in Architecture, 2017.\n"
+    "Skills\n"
+    "Architectural Design, Revit, AutoCAD, Project Management.\n"
+)
+
+OFERTA_QA = """Responsibilities
+Collaborate with Product, Design, and Development teams to understand product requirements and create test plans.
+Requirements
+3+ years of mobile app automation with Espresso, XCUITest, Java, Android and iOS.
+Expertise in regression testing, accessibility and Agile practices.
+Excellent communication skills.
+Nice to have
+Knowledge of Swift.
+Benefits
+Healthcare benefits and paid time off.
+"""
+
+CV_QA = (
+    "Ana QA\n"
+    "QA Engineer\n"
+    "Email: ana@example.com\n"
+    "Work Experience\n"
+    "QA testing for mobile apps, 2020-2024.\n"
+    "Education\n"
+    "BSc Computer Science, 2019.\n"
+    "Skills\n"
+    "QA, communication.\n"
+)
+
+OFERTA_QA_SINONIMOS = (
+    "Requirements: Quality Assurance experience, communication skills and mobile testing."
+)
+
 
 def test_analizar_devuelve_las_cuatro_dimensiones():
     resultado = analizar(CV, OFERTA, motor_similitud="tfidf")
@@ -72,3 +117,52 @@ def test_separa_calidad_ats_de_compatibilidad():
     assert resultado["puntaje_match"] < 20
     assert resultado["nivel_match"] == "bajo"
     assert resultado["dimensiones"]["keyword_gap"]["faltantes"]
+
+
+def test_segmentar_oferta_ignora_beneficios_y_tareas():
+    secciones = segmentar_oferta(OFERTA_QA)
+
+    assert "design" in secciones["responsabilidades"].lower()
+    assert "java" in secciones["requisitos"].lower()
+    assert "swift" in secciones["deseables"].lower()
+    assert "healthcare" in secciones["beneficios"].lower()
+
+
+def test_normaliza_sinonimos_de_oferta_y_cv():
+    assert normalizar_habilidad("Quality Assurance") == "qa"
+    assert normalizar_habilidad("communication skills") == "communication"
+    assert normalizar_habilidad("CI/CD") == "ci"
+    assert normalizar_habilidad("Regression Testing") == "regression"
+
+
+def test_qa_matchea_quality_assurance_y_communication_skills():
+    resultado = analizar(CV_QA, OFERTA_QA_SINONIMOS, motor_similitud="tfidf")
+    requisitos = resultado["requisitos"]
+
+    assert {"qa", "communication"} <= set(requisitos["obligatorios_cumplidos"])
+
+
+def test_cap_por_requisitos_centrales():
+    assert cap_por_requisitos(0) == 25.0
+    assert cap_por_requisitos(29.9) == 25.0
+    assert cap_por_requisitos(30) == 50.0
+    assert cap_por_requisitos(49.9) == 50.0
+    assert cap_por_requisitos(50) is None
+
+
+def test_arquitecto_contra_qa_queda_bajo_y_sin_falsos_positivos():
+    resultado = analizar(CV_ARQUITECTO, OFERTA_QA, motor_similitud="tfidf")
+    requisitos = resultado["requisitos"]
+    gap = resultado["dimensiones"]["keyword_gap"]
+
+    assert resultado["puntaje_ats"] >= 80
+    assert resultado["puntaje_match"] < 20
+    assert resultado["nivel_match"] == "bajo"
+    assert requisitos["confianza"] == "alta"
+    assert requisitos["cap_match"] == 25.0
+    assert {"android", "espresso", "ios", "java", "xcuitest"} <= set(
+        requisitos["obligatorios_faltantes"]
+    )
+    assert "swift" in requisitos["deseables_faltantes"]
+    assert "design" not in gap["faltantes"]
+    assert "healthcare" not in gap["faltantes"]

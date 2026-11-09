@@ -13,10 +13,21 @@ from pydantic import BaseModel, ConfigDict, Field
 MotorSimilitud = Literal["tfidf", "embeddings", "embeddings_fragmentos"]
 
 EJEMPLO_RESPUESTA = {
-    "puntaje_global": 35.0,
+    "puntaje_global": 25.0,
     "puntaje_ats": 87.5,
-    "puntaje_match": 35.0,
+    "puntaje_match": 25.0,
     "nivel_match": "medio",
+    "requisitos": {
+        "obligatorios_cumplidos": [],
+        "obligatorios_faltantes": [".net", "asp.net", "database design", "problem-solving"],
+        "deseables_cumplidos": [],
+        "deseables_faltantes": [],
+        "cobertura_obligatorios": 0.0,
+        "cobertura_total": 0.0,
+        "cap_match": 25.0,
+        "secciones_detectadas": ["responsabilidades", "requisitos"],
+        "confianza": "alta",
+    },
     "metadatos": {
         "archivo": "cv.pdf",
         "paginas": 1,
@@ -39,9 +50,9 @@ EJEMPLO_RESPUESTA = {
         "keyword_gap": {
             "puntaje": 0.0,
             "coincidencias": [],
-            "faltantes": [".net", "agile", "design"],
-            "total_oferta": 9,
-            "total_cv": 0,
+            "faltantes": [".net", "asp.net", "database design", "problem-solving"],
+            "total_oferta": 4,
+            "total_cv": 8,
         },
         "similitud": {"puntaje": 38.9, "motor": "tfidf", "crudo": 0.0623},
     },
@@ -99,6 +110,33 @@ class MetadatosOut(BaseModel):
     tiempo_ms: int = Field(ge=0, description="Lectura del PDF + diagnóstico, en milisegundos")
 
 
+class RequisitosOut(BaseModel):
+    """Requisitos de la oferta separados por obligatorios y deseables."""
+
+    obligatorios_cumplidos: list[str] = Field(description="Skills obligatorias presentes en el CV")
+    obligatorios_faltantes: list[str] = Field(description="Skills obligatorias ausentes en el CV")
+    deseables_cumplidos: list[str] = Field(description="Skills deseables presentes en el CV")
+    deseables_faltantes: list[str] = Field(description="Skills deseables ausentes en el CV")
+    cobertura_obligatorios: float = Field(
+        ge=0, le=100, description="Porcentaje de requisitos obligatorios cubiertos"
+    )
+    cobertura_total: float = Field(
+        ge=0, le=100, description="Cobertura ponderada: obligatorios 100%, deseables 40%"
+    )
+    cap_match: float | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="Tope aplicado al match si faltan requisitos centrales",
+    )
+    secciones_detectadas: list[str] = Field(
+        description="Secciones de la oferta usadas para extraer requisitos"
+    )
+    confianza: Literal["alta", "baja"] = Field(
+        description="Alta si se detectaron secciones; baja si se usó todo el texto"
+    )
+
+
 class DiagnosticoOut(BaseModel):
     """Resultado completo del diagnóstico de un CV contra una oferta."""
 
@@ -122,6 +160,7 @@ class DiagnosticoOut(BaseModel):
     nivel_match: Literal["bajo", "medio", "bueno", "muy bueno"] = Field(
         description="Etiqueta cualitativa de puntaje_match"
     )
+    requisitos: RequisitosOut
     metadatos: MetadatosOut
     dimensiones: DimensionesOut
 

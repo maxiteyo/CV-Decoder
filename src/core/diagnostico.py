@@ -56,6 +56,77 @@ SECCION_ENCABEZADOS = {
 }
 MAX_LARGO_ENCABEZADO = 60
 
+# Encabezados de la oferta. Se separan requisitos, deseables y beneficios para
+# no contar como obligatorio algo que aparece en "Benefits" o en una tarea.
+SECCIONES_OFERTA = {
+    "responsabilidades": re.compile(
+        r"^(?:responsibilities|responsabilidades|role description|the role|"
+        r"about the role|what you(?:'ll| will) do|day to day|key duties|"
+        r"main tasks)\b",
+        re.IGNORECASE,
+    ),
+    "requisitos": re.compile(
+        r"^(?:requirements|requisitos|qualifications|minimum qualifications|"
+        r"basic qualifications|must[\s-]+have|what we(?:'re| are) looking for|"
+        r"what you bring)\b",
+        re.IGNORECASE,
+    ),
+    "deseables": re.compile(
+        r"^(?:nice[\s-]+to[\s-]+have|preferred qualifications|deseables|"
+        r"desired qualifications|bonus points)\b",
+        re.IGNORECASE,
+    ),
+    "beneficios": re.compile(
+        r"^(?:benefits|beneficios|we offer|perks|what we offer|compensation)\b",
+        re.IGNORECASE,
+    ),
+}
+
+# "Requirements:" y "Responsibilities:" pueden venir en la misma línea.
+ENCABEZADO_INLINE = re.compile(
+    r"\b(responsibilities|responsabilidades|role description|the role|"
+    r"about the role|requirements|requisitos|qualifications|minimum qualifications|"
+    r"nice[\s-]+to[\s-]+have|preferred qualifications|deseables|"
+    r"benefits|beneficios|we offer|perks)\s*:",
+    re.IGNORECASE,
+)
+
+# Sinónimos que aparecen distinto en CVs y ofertas. El valor es la forma
+# canónica que se usa para comparar; el listado visible también usa esa forma.
+SINONIMOS_HABILIDAD = {
+    "quality assurance": "qa",
+    "quality assurance (qa)": "qa",
+    "qa testing": "qa",
+    "javascript": "javascript",
+    "js": "javascript",
+    "typescript": "typescript",
+    "ts": "typescript",
+    "continuous integration": "ci",
+    "ci/cd": "ci",
+    "communication skills": "communication",
+    "communication skill": "communication",
+    "regression testing": "regression",
+    "api testing": "api",
+    "integration testing": "integration",
+    "object-oriented programming": "oop",
+    "object oriented programming": "oop",
+    "asp.net mvc": "asp.net",
+    "dotnet": ".net",
+    ".net core": ".net",
+    "nodejs": "node.js",
+    "reactjs": "react",
+}
+
+# Grupos que se consideran equivalentes sin perder el nombre específico en el
+# listado de faltantes (por ejemplo, un CV con iOS cubre "mobile").
+GRUPOS_EQUIVALENTES = (
+    frozenset({"mobile", "ios", "android"}),
+)
+
+PESO_DESEABLE = 0.4
+CAP_SIN_OBLIGATORIOS_BAJO = 25.0
+CAP_SIN_OBLIGATORIOS_MEDIO = 50.0
+
 # Pesos del match: la similitud manda y la brecha de skills aporta, pero la
 # calidad del CV (parseabilidad y secciones) no infla la compatibilidad.
 PESOS_MATCH = {
@@ -117,6 +188,166 @@ def _habilidades_de_doc(doc, texto: str) -> list[str]:
             for span in resolve_overlaps(spans)
         }
     )
+
+
+def _clasificar_encabezado(linea: str) -> str | None:
+    """Devuelve la sección de una línea que es solo un encabezado."""
+    limpia = linea.strip().strip("•*# ").strip()
+    if not limpia or len(limpia) > 80:
+        return None
+    if limpia.endswith(":"):
+        limpia = limpia[:-1].strip()
+    elif ":" in limpia:
+        # Tiene contenido después de los dos puntos: lo maneja ENCABEZADO_INLINE.
+        return None
+    limpia = limpia.lower()
+    for nombre, patron in SECCIONES_OFERTA.items():
+        if patron.match(limpia):
+            return nombre
+    return None
+
+
+def segmentar_oferta(texto: str) -> dict[str, str]:
+    """Separa la oferta en responsabilidades, requisitos, deseables y beneficios.
+
+    Si un encabezado viene en la misma línea que el contenido ("Requirements:
+    Java, SQL"), se corta ahí. El texto sin encabezado queda en ``otros``.
+    """
+    secciones: dict[str, list[str]] = {
+        nombre: [] for nombre in (*SECCIONES_OFERTA, "otros")
+    }
+    actual = "otros"
+    for linea in texto.splitlines():
+        coincidencias = list(ENCABEZADO_INLINE.finditer(linea))
+        if coincidencias:
+            anterior = 0
+            for coincidencia in coincidencias:
+                fragmento = linea[anterior : coincidencia.start()].strip()
+                if fragmento:
+                    secciones[actual].append(fragmento)
+                actual = _clasificar_encabezado(coincidencia.group(0)) or "otros"
+                anterior = coincidencia.end()
+            resto = linea[anterior:].strip()
+            if resto:
+                secciones[actual].append(resto)
+            continue
+
+        tipo = _clasificar_encabezado(linea)
+        if tipo:
+            actual = tipo
+        else:
+            secciones[actual].append(linea)
+
+    return {nombre: "\n".join(partes).strip() for nombre, partes in secciones.items()}
+
+
+def normalizar_habilidad(habilidad: str) -> str:
+    """Lleva una habilidad a su forma canónica para comparar CV y oferta."""
+    limpia = re.sub(r"\s+", " ", habilidad.lower().strip().strip("\"',;:()[]"))
+    if limpia.endswith("."):
+        limpia = limpia[:-1].rstrip()
+    return SINONIMOS_HABILIDAD.get(limpia, limpia)
+
+
+def _habilidades_de_texto(texto: str, nlp) -> set[str]:
+    if not texto.strip():
+        return set()
+    doc = nlp.make_doc(texto)
+    return {normalizar_habilidad(h) for h in _habilidades_de_doc(doc, texto)}
+
+
+def _coincide_habilidad(habilidad: str, skills_cv: set[str]) -> bool:
+    if habilidad in skills_cv:
+        return True
+    for grupo in GRUPOS_EQUIVALENTES:
+        if habilidad in grupo and skills_cv & grupo:
+            return True
+    return False
+
+
+def cap_por_requisitos(cobertura_obligatorios: float) -> float | None:
+    """Cap del match cuando faltan requisitos centrales (Fase 2)."""
+    if cobertura_obligatorios < 30.0:
+        return CAP_SIN_OBLIGATORIOS_BAJO
+    if cobertura_obligatorios < 50.0:
+        return CAP_SIN_OBLIGATORIOS_MEDIO
+    return None
+
+
+def _competencias_de_oferta(oferta_texto: str, nlp) -> dict:
+    secciones = segmentar_oferta(oferta_texto)
+    if secciones["requisitos"] or secciones["deseables"]:
+        confianza = "alta"
+        texto_requisitos = secciones["requisitos"]
+        texto_deseables = secciones["deseables"]
+    else:
+        confianza = "baja"
+        texto_requisitos = oferta_texto
+        texto_deseables = ""
+
+    obligatorios = _habilidades_de_texto(texto_requisitos, nlp)
+    deseables = _habilidades_de_texto(texto_deseables, nlp) - obligatorios
+    if not obligatorios and not deseables:
+        texto_requisitos = oferta_texto
+        obligatorios = _habilidades_de_texto(oferta_texto, nlp)
+        confianza = "baja"
+
+    detectadas = [
+        nombre
+        for nombre in ("responsabilidades", "requisitos", "deseables", "beneficios")
+        if secciones[nombre]
+    ]
+    return {
+        "obligatorios": obligatorios,
+        "deseables": deseables,
+        "secciones_detectadas": detectadas or ["texto_completo"],
+        "confianza": confianza,
+    }
+
+
+def _evaluar_requisitos(
+    obligatorios: set[str],
+    deseables: set[str],
+    skills_cv: set[str],
+) -> dict:
+    coincidencias_obligatorias = sorted(
+        h for h in obligatorios if _coincide_habilidad(h, skills_cv)
+    )
+    faltantes_obligatorias = sorted(
+        h for h in obligatorios if not _coincide_habilidad(h, skills_cv)
+    )
+    coincidencias_deseables = sorted(
+        h for h in deseables if _coincide_habilidad(h, skills_cv)
+    )
+    faltantes_deseables = sorted(
+        h for h in deseables if not _coincide_habilidad(h, skills_cv)
+    )
+
+    cobertura_obligatorios = (
+        100.0 * len(coincidencias_obligatorias) / len(obligatorios)
+        if obligatorios
+        else 100.0
+    )
+    peso_total = len(obligatorios) + PESO_DESEABLE * len(deseables)
+    peso_cubierto = (
+        len(coincidencias_obligatorias) + PESO_DESEABLE * len(coincidencias_deseables)
+    )
+    cobertura_total = 100.0 * peso_cubierto / peso_total if peso_total else 100.0
+    cap = cap_por_requisitos(cobertura_obligatorios) if obligatorios else None
+
+    return {
+        "coincidencias_obligatorias": coincidencias_obligatorias,
+        "faltantes_obligatorias": faltantes_obligatorias,
+        "coincidencias_deseables": coincidencias_deseables,
+        "faltantes_deseables": faltantes_deseables,
+        "coincidencias": sorted(set(coincidencias_obligatorias) | set(coincidencias_deseables)),
+        "faltantes": sorted(set(faltantes_obligatorias) | set(faltantes_deseables)),
+        "cobertura_obligatorios": round(cobertura_obligatorios, 1),
+        "cobertura_total": round(cobertura_total, 1),
+        "cap_match": cap,
+        "total_oferta": len(obligatorios | deseables),
+        "total_cv": len(skills_cv),
+    }
 
 
 def extraer_entidades(texto: str) -> list[dict]:
@@ -206,21 +437,23 @@ def analizar(
 
     # El CV se procesa una sola vez y de ahí salen entidades, skills y secciones.
     perfil = procesar_cv(cv_texto)
-    skills_cv = perfil["habilidades"]
+    skills_cv = {normalizar_habilidad(h) for h in perfil["habilidades"]}
     secciones = perfil["secciones"]
     faltantes_seccion = [s for s, presente in secciones.items() if not presente]
 
-    skills_oferta = _habilidades_de_doc(nlp(oferta_texto), oferta_texto)
-    coincidencias = sorted(set(skills_cv) & set(skills_oferta))
-    gaps = sorted(set(skills_oferta) - set(skills_cv))
-    cobertura = (len(coincidencias) / len(skills_oferta)) if skills_oferta else 1.0
+    competencias = _competencias_de_oferta(oferta_texto, nlp)
+    evaluacion = _evaluar_requisitos(
+        competencias["obligatorios"],
+        competencias["deseables"],
+        skills_cv,
+    )
 
     modelo = get_similarity_model(motor_similitud)
     similitud_valor = modelo.similitud(cv_texto, oferta_texto)
 
     dim_parseabilidad = puntaje_parseabilidad(cv_texto)
     dim_secciones = round(100 * sum(secciones.values()) / len(secciones), 1)
-    dim_gap = round(100 * cobertura, 1)
+    dim_gap = evaluacion["cobertura_total"]
     dim_similitud = modelo.puntaje(similitud_valor)
 
     puntaje_ats = round(
@@ -228,12 +461,16 @@ def analizar(
         + PESOS_ATS["secciones"] * dim_secciones,
         1,
     )
-    puntaje_match = round(
+    puntaje_match_bruto = round(
         pesos["similitud"] * dim_similitud
         + pesos["keyword_gap"] * dim_gap
         + pesos["secciones"] * dim_secciones
         + pesos["parseabilidad"] * dim_parseabilidad,
         1,
+    )
+    cap = evaluacion["cap_match"]
+    puntaje_match = (
+        round(min(puntaje_match_bruto, cap), 1) if cap is not None else puntaje_match_bruto
     )
     # Alias de compatibilidad: la API existente sigue leyendo puntaje_global.
     puntaje_global = puntaje_match
@@ -243,6 +480,17 @@ def analizar(
         "puntaje_ats": puntaje_ats,
         "puntaje_match": puntaje_match,
         "nivel_match": nivel_match(puntaje_match),
+        "requisitos": {
+            "obligatorios_cumplidos": evaluacion["coincidencias_obligatorias"],
+            "obligatorios_faltantes": evaluacion["faltantes_obligatorias"],
+            "deseables_cumplidos": evaluacion["coincidencias_deseables"],
+            "deseables_faltantes": evaluacion["faltantes_deseables"],
+            "cobertura_obligatorios": evaluacion["cobertura_obligatorios"],
+            "cobertura_total": evaluacion["cobertura_total"],
+            "cap_match": cap,
+            "secciones_detectadas": competencias["secciones_detectadas"],
+            "confianza": competencias["confianza"],
+        },
         "dimensiones": {
             "parseabilidad": {"puntaje": dim_parseabilidad},
             "secciones": {
@@ -252,10 +500,10 @@ def analizar(
             },
             "keyword_gap": {
                 "puntaje": dim_gap,
-                "coincidencias": coincidencias,
-                "faltantes": gaps,
-                "total_oferta": len(skills_oferta),
-                "total_cv": len(skills_cv),
+                "coincidencias": evaluacion["coincidencias"],
+                "faltantes": evaluacion["faltantes"],
+                "total_oferta": evaluacion["total_oferta"],
+                "total_cv": evaluacion["total_cv"],
             },
             "similitud": {
                 "puntaje": dim_similitud,

@@ -37,6 +37,17 @@ RUIDO_CVS_REALES: set[str] = {
     "years of experience", "years experience",
 }
 
+# Términos técnicos específicos que faltaban en las fuentes originales. Se
+# agregan a mano porque son señales fuertes en ofertas de QA/mobile y evitan
+# que el diccionario los ignore (antes "Espresso" y "XCUITest" no existían).
+REFUERZO_TECNICO: set[str] = {
+    "qa", "espresso", "xcuitest", "appium", "katalon", "selendroid",
+    "monkeytalk", "postman", "intellij http client", "charles proxy",
+    "splunk", "sentry", "functional programming", "test planning",
+    "test strategy", "ui automation", "mobile app automation", "api",
+    "api testing", "oop", "object-oriented programming",
+}
+
 # Extrae cadenas entre comillas simples o dobles de un archivo TypeScript.
 _TS_STRING = re.compile(r"['\"]([A-Za-z0-9+#./&\- ]{2,40})['\"]")
 
@@ -94,6 +105,7 @@ def build_skill_lexicon(
     lexicon = set()
     lexicon |= _load_keyword_dataset(refs_dir)
     lexicon |= _load_screener(refs_dir)
+    lexicon |= REFUERZO_TECNICO
     if include_job_skills and job_skills_csv is not None:
         lexicon |= _load_job_skills(job_skills_csv)
 

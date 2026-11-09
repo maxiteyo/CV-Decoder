@@ -196,9 +196,12 @@ que son buenos y complete `puntaje_humano`.
 
 | Caso | Resultado |
 |---|---|
-| CV real de software (cv 5) vs oferta .NET (`par_005`) | match **35,0** · ATS **87,5** · parseabilidad 100 · secciones 75 · similitud 38,9 |
+| CV real de software (cv 5) vs oferta .NET (`par_005`) | match **25,0** · ATS **87,5** · parseabilidad 100 · secciones 75 · similitud 38,9 |
 | CV real sin relación (cv 92) vs la misma oferta | match **3,7** · ATS **87,5** · parseabilidad 100 · secciones 75 · similitud **4,1** |
 | CV escaneado | rechazado con mensaje claro (sin OCR no hay diagnóstico) |
+
+El match de `par_005` queda topado en 25 porque faltan requisitos centrales de
+la oferta (`.net`, `asp.net`, `database design`, `oop`, `problem-solving`).
 
 Reproducir: `.venv/bin/python scripts/demo_diagnostico.py --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" --par par_005`.
 

@@ -129,6 +129,17 @@ def test_diagnostico_completo(client, tmp_path):
     assert cuerpo["puntaje_global"] == cuerpo["puntaje_match"]
     assert 0 <= cuerpo["puntaje_ats"] <= 100
     assert cuerpo["nivel_match"] in {"bajo", "medio", "bueno", "muy bueno"}
+    assert set(cuerpo["requisitos"]) == {
+        "obligatorios_cumplidos",
+        "obligatorios_faltantes",
+        "deseables_cumplidos",
+        "deseables_faltantes",
+        "cobertura_obligatorios",
+        "cobertura_total",
+        "cap_match",
+        "secciones_detectadas",
+        "confianza",
+    }
     assert cuerpo["metadatos"]["archivo"] == "cv.pdf"
     assert cuerpo["metadatos"]["paginas"] >= 1
     assert cuerpo["metadatos"]["palabras"] >= 20
@@ -161,6 +172,9 @@ def test_diagnostico_completo(client, tmp_path):
         + PESOS_POR_DEFECTO["keyword_gap"] * gap["puntaje"]
         + PESOS_POR_DEFECTO["parseabilidad"] * dimensiones["parseabilidad"]["puntaje"]
     )
+    cap = cuerpo["requisitos"]["cap_match"]
+    if cap is not None:
+        esperado = min(esperado, cap)
     assert cuerpo["puntaje_global"] == pytest.approx(esperado, abs=0.11)
 
 

@@ -22,7 +22,7 @@ cd /home/sofia/CV-Decoder
 Resultado esperado:
 
 ```text
-23 passed
+28 passed
 ```
 
 Si falla algún test, no sigas con las otras pruebas: primero hay que revisar el
@@ -41,10 +41,14 @@ No necesita levantar la API.
 Resultado esperado:
 
 ```text
-"puntaje_global": 35.0,
+"puntaje_global": 25.0,
 "puntaje_ats": 87.5,
-"puntaje_match": 35.0,
+"puntaje_match": 25.0,
 "nivel_match": "medio",
+"requisitos": {
+  "cap_match": 25.0,
+  "cobertura_obligatorios": 0.0
+},
 "similitud": {
   "puntaje": 38.9,
   "crudo": 0.0623
@@ -131,6 +135,7 @@ La forma más cómoda es Swagger:
 | `puntaje_match` | Compatibilidad con la oferta, de 0 a 100. |
 | `puntaje_global` | Alias de `puntaje_match` (compatibilidad). |
 | `nivel_match` | Etiqueta: bajo, medio, bueno o muy bueno. |
+| `requisitos` | Requisitos obligatorios/deseables, cobertura y cap aplicado. |
 | `dimensiones.parseabilidad` | Si el PDF se pudo leer correctamente. |
 | `dimensiones.secciones` | Qué secciones detectó (experiencia, educación, habilidades, etc.). |
 | `dimensiones.keyword_gap` | Skills de la oferta que no aparecen en el CV. |
