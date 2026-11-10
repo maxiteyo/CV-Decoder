@@ -372,7 +372,7 @@ API sin depender de los detalles internos.
   comparar, asumiendo la primera carga (~35 s).
 - **¿Cómo se prueba la API?**
   `uvicorn src.api.main:app`, abrir `http://127.0.0.1:8000/docs` y usar "Try it
-  out"; o `python scripts/cliente_api.py`; o `python -m pytest -q` (28 pruebas).
+  out"; o `python scripts/cliente_api.py`; o `python -m pytest -q` (33 pruebas).
 
 ---
 
@@ -494,7 +494,7 @@ Para la API (el modelo ya tiene que estar entrenado):
 
 ```bash
 uvicorn src.api.main:app --reload    # en una terminal; abrir /docs
-python -m pytest -q                  # en otra; 28 pruebas
+python -m pytest -q                  # en otra; 33 pruebas
 ```
 
 Los PDFs reales y la planilla de pares calificados son datos del equipo: no están
@@ -529,13 +529,14 @@ Commits del proyecto (los más importantes):
 ## 11. Estado actual y próximo paso
 
 **Cerrado:** Etapa A (datos + NER + diccionario), Etapa B (parseabilidad real,
-secciones, similitud, calibración, mediciones y documentación) y Etapa C (API
-FastAPI, pruebas y guía de uso).
+secciones, similitud, calibración, mediciones y documentación), Etapa C (API
+FastAPI, pruebas y guía de uso) y scoring Fases 1–3 (ATS/match separados,
+requisitos obligatorios/deseables, similitud por secciones y seniority).
 
 **Siguiente:** preparar la defensa (presentación, demo y repaso de los números).
 La demo puede ser: levantar la API, mostrar `/docs`, diagnosticar un CV real
 (25,0 de match y 87,5 de ATS), mostrar el rechazo de un escaneo (422) y correr
-las 28 pruebas.
+las 33 pruebas.
 
 **Opcional — techo validado y recalibrado:** se armaron 10 pares nuevos del mismo
 oficio; el máximo coseno fue **0,1174**, así que el techo 0,10 saturaba. Se

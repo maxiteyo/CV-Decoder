@@ -166,3 +166,121 @@ def test_arquitecto_contra_qa_queda_bajo_y_sin_falsos_positivos():
     assert "swift" in requisitos["deseables_faltantes"]
     assert "design" not in gap["faltantes"]
     assert "healthcare" not in gap["faltantes"]
+
+
+CV_ESTUDIANTE = (
+    "Ana Student\n"
+    "Computer Science Student\n"
+    "Email: ana@example.com\n"
+    "Education\n"
+    "BSc Computer Science, 2025\n"
+    "Skills\n"
+    "Python, SQL, JavaScript, Git, communication.\n"
+    "Projects\n"
+    "Built web applications with Python and SQL.\n"
+)
+
+OFERTA_JUNIOR = (
+    "Junior Software Developer\n"
+    "Requirements: Python, SQL, JavaScript, Git and communication skills.\n"
+    "Responsibilities: build web applications and learn from senior engineers.\n"
+)
+
+OFERTA_SENIOR = (
+    "Senior Software Engineer\n"
+    "Requirements: 5+ years of Python, SQL, JavaScript and Git. Leadership experience.\n"
+    "Responsibilities: design distributed systems and mentor engineers.\n"
+)
+
+CV_POCA_EXPERIENCIA = (
+    "Ana Junior\n"
+    "Software Engineer\n"
+    "Email: ana@example.com\n"
+    "Work Experience\n"
+    "Software Engineer, 2023-2024. Built software with Python and SQL.\n"
+    "Skills\n"
+    "Python, SQL.\n"
+)
+
+OFERTA_CINCO_ANIOS = (
+    "Software Engineer\n"
+    "Responsibilities: build software and maintain APIs.\n"
+    "Requirements: 5+ years of Python and SQL.\n"
+)
+
+
+def test_match_usa_secciones_y_expone_detalle():
+    resultado = analizar(CV_ARQUITECTO, OFERTA_QA, motor_similitud="tfidf")
+    similitud = resultado["dimensiones"]["similitud"]
+
+    assert similitud["fuente"] == "secciones"
+    assert set(similitud["detalle"]) == {"experiencia", "habilidades"}
+    assert similitud["puntaje"] == pytest.approx(
+        0.60 * similitud["detalle"]["experiencia"]
+        + 0.40 * similitud["detalle"]["habilidades"],
+        abs=0.2,
+    )
+
+
+def test_seniority_penaliza_deficit_de_anios_sin_bonificar():
+    resultado = analizar(CV_POCA_EXPERIENCIA, OFERTA_CINCO_ANIOS, motor_similitud="tfidf")
+    seniority = resultado["seniority"]
+
+    assert seniority["anos_cv"] == 1
+    assert seniority["anos_pedidos"] == 5
+    assert seniority["nivel_cv"] is None
+    assert seniority["nivel_oferta"] is None
+    assert seniority["ajuste"] == pytest.approx(0.84)
+
+    suficiente = analizar(CV_ARQUITECTO, OFERTA_QA, motor_similitud="tfidf")["seniority"]
+    assert suficiente["anos_cv"] == 6
+    assert suficiente["anos_pedidos"] == 3
+    assert suficiente["ajuste"] == 1.0
+
+
+def test_seniority_no_compensa_skills_centrales_faltantes():
+    resultado = analizar(CV_DOCENTE, OFERTA_MOBILE, motor_similitud="tfidf")
+
+    assert resultado["seniority"]["anos_cv"] == 5
+    assert resultado["seniority"]["anos_pedidos"] == 7
+    assert resultado["seniority"]["ajuste"] < 1.0
+    assert resultado["requisitos"]["cap_match"] == 25.0
+    assert resultado["puntaje_match"] < 20
+
+
+def test_estudiante_junior_supera_estudiante_senior_sin_quedar_en_bajo_extremo():
+    junior = analizar(CV_ESTUDIANTE, OFERTA_JUNIOR, motor_similitud="tfidf")
+    senior = analizar(CV_ESTUDIANTE, OFERTA_SENIOR, motor_similitud="tfidf")
+
+    assert junior["puntaje_match"] >= 50
+    assert senior["puntaje_match"] >= 20
+    assert junior["puntaje_match"] > senior["puntaje_match"]
+
+
+CV_SIN_SECCION_HABILIDADES = (
+    "Ana Developer\n"
+    "Software Developer\n"
+    "Email: ana@example.com\n"
+    "Work Experience\n"
+    "Software Developer at Acme, 2020-2024. Built APIs with Python and SQL.\n"
+    "Education\n"
+    "BSc Computer Science, 2019\n"
+)
+
+OFERTA_PYTHON = (
+    "Software Developer\n"
+    "Responsibilities: build APIs and maintain internal tools.\n"
+    "Requirements: Python, SQL and API development.\n"
+)
+
+
+def test_cv_sin_seccion_habilidades_matchea_alto_pero_baja_ats():
+    resultado = analizar(
+        CV_SIN_SECCION_HABILIDADES, OFERTA_PYTHON, motor_similitud="tfidf"
+    )
+    secciones = resultado["dimensiones"]["secciones"]
+
+    assert secciones["detalle"]["Habilidades"] is False
+    assert "Habilidades" in secciones["faltantes"]
+    assert resultado["puntaje_ats"] < 100
+    assert resultado["puntaje_match"] >= 50

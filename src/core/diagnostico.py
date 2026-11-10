@@ -18,6 +18,7 @@ API existente. El ATS no se suma al match: un CV puede ser 100 ATS y 10 match.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 
 from src.core.nlp_engine import get_nlp, get_skill_matcher
 from src.data_loader.cleaning import resolve_overlaps
@@ -40,17 +41,20 @@ SECCION_ENCABEZADOS = {
     "Experiencia": re.compile(
         r"^(?:\W*)(work\s+)?(experience|employment|professional\s+experience|"
         r"work\s+history|career\s+(history|summary)|employment\s+history|"
-        r"professional\s+background)\b",
+        r"professional\s+background|experiencia(?:\s+laboral|\s+profesional)?|"
+        r"trayectoria)\b",
         re.IGNORECASE,
     ),
     "Educacion": re.compile(
         r"^(?:\W*)(education|academic\s+(background|qualifications?)|"
-        r"educational\s+background|qualifications|studies)\b",
+        r"educational\s+background|qualifications|studies|educaci[oó]n|"
+        r"formaci[oó]n|estudios)\b",
         re.IGNORECASE,
     ),
     "Habilidades": re.compile(
         r"^(?:\W*)(skills|technical\s+skills|core\s+competenc|competencies|"
-        r"technologies|areas\s+of\s+expertise|expertise)\b",
+        r"technologies|areas\s+of\s+expertise|expertise|habilidades|"
+        r"competencias|conocimientos)\b",
         re.IGNORECASE,
     ),
 }
@@ -126,6 +130,54 @@ GRUPOS_EQUIVALENTES = (
 PESO_DESEABLE = 0.4
 CAP_SIN_OBLIGATORIOS_BAJO = 25.0
 CAP_SIN_OBLIGATORIOS_MEDIO = 50.0
+
+# Fase 3: años y seniority. Solo se usan como ajuste moderado; nunca pueden
+# compensar la falta de habilidades centrales (el cap de requisitos manda).
+ANIOS_RE = re.compile(r"(\d{1,2})\s*\+?\s*(?:years?|yrs?|años?)", re.IGNORECASE)
+RANGO_ANIOS_RE = re.compile(r"\b(19\d{2}|20\d{2})\b")
+PRESENTE_RE = re.compile(
+    r"\b(present|presente|actualidad|current|till date|to date)\b", re.IGNORECASE
+)
+NIVEL_VALORES = {
+    "intern": 0,
+    "trainee": 0,
+    "junior": 1,
+    "jr": 1,
+    "mid": 2,
+    "middle": 2,
+    "senior": 3,
+    "sr": 3,
+    "lead": 4,
+    "staff": 4,
+    "principal": 5,
+    "director": 5,
+    "head": 5,
+    "chief": 5,
+}
+NIVEL_CANONICO = {
+    0: "intern",
+    1: "junior",
+    2: "mid",
+    3: "senior",
+    4: "lead",
+    5: "principal",
+}
+NIVEL_RE = re.compile(
+    r"\b(intern|trainee|junior|jr|mid|middle|senior|sr|lead|staff|principal|"
+    r"director|head|chief)\b",
+    re.IGNORECASE,
+)
+# "Head Up Display" no es un nivel; "mid-2019" tampoco.
+NIVEL_FALSOS = ("head up", "head-up", "head office", "headquarters", "mid-")
+# El nivel solo cuenta en líneas que parecen un puesto ("Senior Engineer"), no
+# en un apellido ("Ana Junior") ni en una frase suelta ("learn from seniors").
+ROL_RE = re.compile(
+    r"\b(engineer|developer|programmer|architect|manager|analyst|consultant|"
+    r"specialist|designer|director|scientist|teacher|professor|instructor|"
+    r"assistant|coordinator|administrator|technician|officer|executive|"
+    r"recruiter|accountant|nurse|doctor|lawyer|supervisor|support|lead)\b",
+    re.IGNORECASE,
+)
 
 # Pesos del match: la similitud manda y la brecha de skills aporta, pero la
 # calidad del CV (parseabilidad y secciones) no infla la compatibilidad.
@@ -241,6 +293,148 @@ def segmentar_oferta(texto: str) -> dict[str, str]:
     return {nombre: "\n".join(partes).strip() for nombre, partes in secciones.items()}
 
 
+def _clasificar_encabezado_cv(linea: str) -> str | None:
+    """Devuelve la sección de una línea que es solo un encabezado del CV."""
+    limpia = linea.strip().strip("•*# ").strip()
+    if not limpia or len(limpia) > MAX_LARGO_ENCABEZADO:
+        return None
+    if limpia.endswith(":"):
+        limpia = limpia[:-1].strip()
+    elif ":" in limpia:
+        return None
+    limpia = limpia.lower()
+    for nombre, patron in SECCION_ENCABEZADOS.items():
+        if patron.match(limpia):
+            return nombre
+    return None
+
+
+def segmentar_cv(texto: str) -> dict[str, str]:
+    """Separa el CV en experiencia, educación, habilidades y otros.
+
+    Es la contraparte de ``segmentar_oferta`` para la Fase 3. Si el CV no tiene
+    encabezados claros, todo queda en ``otros`` y el llamador usa el texto
+    completo como respaldo.
+    """
+    secciones: dict[str, list[str]] = {
+        "experiencia": [],
+        "educacion": [],
+        "habilidades": [],
+        "otros": [],
+    }
+    mapa = {
+        "Experiencia": "experiencia",
+        "Educacion": "educacion",
+        "Habilidades": "habilidades",
+    }
+    actual = "otros"
+    for linea in texto.splitlines():
+        tipo = _clasificar_encabezado_cv(linea)
+        if tipo:
+            actual = mapa[tipo]
+        else:
+            secciones[actual].append(linea)
+    return {nombre: "\n".join(partes).strip() for nombre, partes in secciones.items()}
+
+
+def _anos_trabajados(cv_texto: str, experiencia_texto: str) -> int | None:
+    """Años trabajados según fechas de experiencia o mención explícita.
+
+    Si hay "2019 - Present" se toma el año actual como fin. La educación no se
+    usa cuando existe una sección de experiencia, para no sumar años de estudio.
+    """
+    base = experiencia_texto or cv_texto
+    anios = [int(a) for a in RANGO_ANIOS_RE.findall(base)]
+    if PRESENTE_RE.search(base):
+        anios.append(datetime.now().year)
+    span = max(anios) - min(anios) if anios else 0
+    explicitos = [int(m.group(1)) for m in ANIOS_RE.finditer(cv_texto)]
+    if not anios and not explicitos:
+        return None
+    return max(span, max(explicitos, default=0))
+
+
+def _anos_pedidos(oferta_texto: str) -> int | None:
+    valores = [int(m.group(1)) for m in ANIOS_RE.finditer(oferta_texto)]
+    return max(valores) if valores else None
+
+
+def _nivel_desde_texto(texto: str, solo_titulo: bool = False) -> str | None:
+    """Nivel máximo mencionado. En ofertas se mira solo el bloque del título.
+
+    Así "aprender de ingenieros senior" en las responsabilidades no convierte
+    una vacante junior en senior.
+    """
+    lineas = [linea for linea in texto.splitlines() if linea.strip()]
+    if solo_titulo:
+        lineas = lineas[:5]
+    niveles: list[int] = []
+    for linea in lineas:
+        minuscula = linea.lower()
+        if any(falso in minuscula for falso in NIVEL_FALSOS):
+            continue
+        if not ROL_RE.search(linea):
+            continue
+        niveles.extend(NIVEL_VALORES[m.group(1).lower()] for m in NIVEL_RE.finditer(linea))
+    if not niveles:
+        return None
+    return NIVEL_CANONICO[max(niveles)]
+
+
+def _ajuste_seniority(
+    anos_cv: int | None,
+    anos_pedidos: int | None,
+    nivel_cv: str | None,
+    nivel_oferta: str | None,
+) -> float:
+    """Penalización moderada por déficit de años o nivel, sin bonificaciones.
+
+    Un CV con más años o más seniority que la oferta no gana puntos extra: eso
+    evita que la veteranía compense habilidades centrales faltantes.
+    """
+    ajuste = 1.0
+    if anos_cv is not None and anos_pedidos:
+        if anos_cv < anos_pedidos:
+            deficit = (anos_pedidos - anos_cv) / anos_pedidos
+            ajuste -= 0.20 * min(deficit, 1.0)
+    if nivel_cv and nivel_oferta:
+        diferencia = NIVEL_VALORES[nivel_oferta] - NIVEL_VALORES[nivel_cv]
+        if diferencia > 0:
+            ajuste -= 0.10 * min(diferencia, 2)
+    return round(max(0.5, ajuste), 3)
+
+
+def _similitud_por_secciones(
+    cv_texto: str,
+    oferta_texto: str,
+    modelo,
+    cv_secciones: dict[str, str],
+    competencias: dict,
+) -> tuple[float, str, dict[str, float]]:
+    """Similitud experiencia↔responsabilidades y habilidades↔requisitos."""
+    cv_experiencia = cv_secciones.get("experiencia", "")
+    cv_habilidades = cv_secciones.get("habilidades", "")
+    oferta_responsabilidades = competencias.get("texto_responsabilidades", "")
+    oferta_requisitos = competencias.get("texto_requisitos_seccion", "")
+
+    if (
+        cv_experiencia
+        and cv_habilidades
+        and oferta_responsabilidades
+        and oferta_requisitos
+    ):
+        sim_experiencia = modelo.similitud(cv_experiencia, oferta_responsabilidades)
+        sim_habilidades = modelo.similitud(cv_habilidades, oferta_requisitos)
+        crudo = 0.60 * sim_experiencia + 0.40 * sim_habilidades
+        detalle = {
+            "experiencia": modelo.puntaje(sim_experiencia),
+            "habilidades": modelo.puntaje(sim_habilidades),
+        }
+        return crudo, "secciones", detalle
+
+    return modelo.similitud(cv_texto, oferta_texto), "texto_completo", {}
+
+
 def normalizar_habilidad(habilidad: str) -> str:
     """Lleva una habilidad a su forma canónica para comparar CV y oferta."""
     limpia = re.sub(r"\s+", " ", habilidad.lower().strip().strip("\"',;:()[]"))
@@ -302,6 +496,10 @@ def _competencias_de_oferta(oferta_texto: str, nlp) -> dict:
         "deseables": deseables,
         "secciones_detectadas": detectadas or ["texto_completo"],
         "confianza": confianza,
+        "texto_requisitos": texto_requisitos,
+        "texto_requisitos_seccion": secciones["requisitos"],
+        "texto_deseables": texto_deseables,
+        "texto_responsabilidades": secciones["responsabilidades"],
     }
 
 
@@ -369,6 +567,27 @@ def _tiene_encabezado(texto: str, patron: re.Pattern) -> bool:
     return False
 
 
+def _tiene_bloque_habilidades(texto: str, habilidades: list[str]) -> bool:
+    """Detecta una lista de skills sin encabezado ("Python, SQL, Docker").
+
+    No alcanza con que una habilidad aparezca en una frase de experiencia: para
+    el ATS cuenta como sección solo si hay una lista dedicada.
+    """
+    if not habilidades:
+        return False
+    for linea in texto.splitlines():
+        linea = linea.strip()
+        if not 0 < len(linea) <= 160:
+            continue
+        partes = [p for p in re.split(r"[,;|]", linea) if p.strip()]
+        if len(partes) < 3:
+            continue
+        minuscula = linea.lower()
+        if sum(1 for h in habilidades if h in minuscula) >= 2:
+            return True
+    return False
+
+
 def detectar_secciones(
     texto: str,
     etiquetas: set[str],
@@ -387,7 +606,9 @@ def detectar_secciones(
         presentes["Contacto"] = True
     if habilidades is None:
         habilidades = extraer_habilidades(texto)
-    presentes["Habilidades"] = presentes.get("Habilidades", False) or len(habilidades) > 0
+    presentes["Habilidades"] = presentes.get("Habilidades", False) or _tiene_bloque_habilidades(
+        texto, habilidades
+    )
     return presentes
 
 
@@ -448,8 +669,21 @@ def analizar(
         skills_cv,
     )
 
+    cv_secciones = segmentar_cv(cv_texto)
     modelo = get_similarity_model(motor_similitud)
-    similitud_valor = modelo.similitud(cv_texto, oferta_texto)
+    similitud_valor, similitud_fuente, similitud_detalle = _similitud_por_secciones(
+        cv_texto, oferta_texto, modelo, cv_secciones, competencias
+    )
+
+    anos_cv = _anos_trabajados(cv_texto, cv_secciones["experiencia"])
+    anos_pedidos = _anos_pedidos(competencias["texto_requisitos"])
+    if anos_pedidos is None:
+        anos_pedidos = _anos_pedidos(oferta_texto)
+    nivel_cv = _nivel_desde_texto(cv_texto)
+    nivel_oferta = _nivel_desde_texto(oferta_texto, solo_titulo=True)
+    ajuste_seniority = _ajuste_seniority(
+        anos_cv, anos_pedidos, nivel_cv, nivel_oferta
+    )
 
     dim_parseabilidad = puntaje_parseabilidad(cv_texto)
     dim_secciones = round(100 * sum(secciones.values()) / len(secciones), 1)
@@ -462,10 +696,13 @@ def analizar(
         1,
     )
     puntaje_match_bruto = round(
-        pesos["similitud"] * dim_similitud
-        + pesos["keyword_gap"] * dim_gap
-        + pesos["secciones"] * dim_secciones
-        + pesos["parseabilidad"] * dim_parseabilidad,
+        (
+            pesos["similitud"] * dim_similitud
+            + pesos["keyword_gap"] * dim_gap
+            + pesos["secciones"] * dim_secciones
+            + pesos["parseabilidad"] * dim_parseabilidad
+        )
+        * ajuste_seniority,
         1,
     )
     cap = evaluacion["cap_match"]
@@ -491,6 +728,13 @@ def analizar(
             "secciones_detectadas": competencias["secciones_detectadas"],
             "confianza": competencias["confianza"],
         },
+        "seniority": {
+            "anos_cv": anos_cv,
+            "anos_pedidos": anos_pedidos,
+            "nivel_cv": nivel_cv,
+            "nivel_oferta": nivel_oferta,
+            "ajuste": ajuste_seniority,
+        },
         "dimensiones": {
             "parseabilidad": {"puntaje": dim_parseabilidad},
             "secciones": {
@@ -509,6 +753,8 @@ def analizar(
                 "puntaje": dim_similitud,
                 "motor": modelo.nombre,
                 "crudo": round(similitud_valor, 4),
+                "fuente": similitud_fuente,
+                "detalle": similitud_detalle,
             },
         },
     }

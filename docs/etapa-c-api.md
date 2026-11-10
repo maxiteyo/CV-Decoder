@@ -161,6 +161,13 @@ Abajo aparecen tres cosas:
     "secciones_detectadas": ["responsabilidades", "requisitos"],
     "confianza": "alta"
   },
+  "seniority": {
+    "anos_cv": 7,
+    "anos_pedidos": null,
+    "nivel_cv": null,
+    "nivel_oferta": null,
+    "ajuste": 1.0
+  },
   "metadatos": {
     "archivo": "cv (5).pdf",
     "paginas": 1,
@@ -187,7 +194,13 @@ Abajo aparecen tres cosas:
       "total_oferta": 5,
       "total_cv": 8
     },
-    "similitud": { "puntaje": 38.9, "motor": "tfidf", "crudo": 0.0623 }
+    "similitud": {
+      "puntaje": 38.9,
+      "motor": "tfidf",
+      "crudo": 0.0623,
+      "fuente": "texto_completo",
+      "detalle": {}
+    }
   }
 }
 ```
@@ -196,10 +209,11 @@ Abajo aparecen tres cosas:
 |---|---|
 | `puntaje_global` | Alias de `puntaje_match` por compatibilidad (0–100). **No** es una probabilidad ni un "apto/no apto". |
 | `puntaje_ats` | Calidad del CV como documento: 50% parseabilidad + 50% secciones. |
-| `puntaje_match` | Compatibilidad con la oferta: 90% similitud + 10% brecha de habilidades. |
+| `puntaje_match` | Compatibilidad con la oferta: (90% similitud + 10% brecha) × ajuste de seniority. |
 | `nivel_match` | Etiqueta cualitativa: bajo, medio, bueno o muy bueno. |
 | `requisitos` | Requisitos obligatorios/deseables, cobertura y cap aplicado. |
 | `requisitos.cap_match` | Tope del match si falta lo central: 25 (<30% de obligatorios) o 50 (<50%). |
+| `seniority` | Años estimados/pedidos, nivel de CV/oferta y ajuste (0,5–1,0; nunca bonifica). |
 | `metadatos.paginas` | Páginas con estructura legible que encontró el lector. |
 | `metadatos.palabras` | Palabras de texto extraídas del PDF. |
 | `metadatos.tiempo_ms` | Lo que tardó el procesamiento: lectura del PDF + NLP, en milisegundos. |
@@ -211,12 +225,15 @@ Abajo aparecen tres cosas:
 | `keyword_gap.puntaje` | Cobertura ponderada de requisitos (obligatorios 100%, deseables 40%). |
 | `similitud.puntaje` | Parecido CV–oferta en escala 0–100 (calibrada). |
 | `similitud.crudo` | Coseno TF-IDF sin calibrar (0–1), para auditoría. |
+| `similitud.fuente` | `secciones` si comparó Experiencia↔Responsibilities y Habilidades↔Requirements; si no, `texto_completo`. |
+| `similitud.detalle` | Puntajes de `experiencia` y `habilidades` cuando se usaron secciones. |
 
 Los puntajes se calculan por separado:
 **ATS = 50% parseabilidad + 50% secciones**;
-**match = 90% similitud + 10% brecha ponderada de requisitos**.
-Si la cobertura de obligatorios es menor al 30%, el match se topa en 25; si es
-menor al 50%, en 50. `puntaje_global` es un alias de `puntaje_match`.
+**match = 90% similitud + 10% brecha ponderada de requisitos**, multiplicado por
+un ajuste de seniority (0,5–1,0). Si la cobertura de obligatorios es menor al
+30%, el match se topa en 25; si es menor al 50%, en 50. `puntaje_global` es un
+alias de `puntaje_match`.
 
 ### 3.2 Probar los errores desde Swagger
 
@@ -411,14 +428,14 @@ OCR está fuera del alcance.
 Archivo: `tests/test_api.py` (16 pruebas). Generan sus propios PDFs al vuelo con
 `fpdf2` y `Pillow`, así que **no dependen de `data/`** (que no se versiona).
 Se suman `tests/test_quality.py` (4 pruebas de parseabilidad) y
-`tests/test_diagnostico.py` (8 pruebas del motor): **28 en total**.
+`tests/test_diagnostico.py` (13 pruebas del motor): **33 en total**.
 
 ```bash
 .venv/bin/python -m pytest -q       # resumen
 .venv/bin/python -m pytest -v       # nombre por nombre
 ```
 
-Resultado: **28 passed** en ~30 s (el modelo se carga una vez).
+Resultado: **33 passed** en ~30 s (el modelo se carga una vez).
 
 Qué cubren:
 
@@ -487,7 +504,7 @@ con el texto ya extraído tarda 0,05–0,20 s.
 5. Subir el CV escaneado → mostrar el **422** con `PDF_SIN_TEXTO` y la sugerencia.
 6. Poner una oferta de dos palabras → mostrar **422** `OFERTA_MUY_CORTA`.
 7. Mostrar la pestaña **Schemas** de Swagger: el contrato es público.
-8. Cerrar con `.venv/bin/python -m pytest -q` → **28 passed**.
+8. Cerrar con `.venv/bin/python -m pytest -q` → **33 passed**.
 9. (Opcional) Mostrar `scripts/cliente_api.py` para probar sin navegador.
 
 Frase para el jurado: *"La API no guarda el CV, no requiere login y rechaza con

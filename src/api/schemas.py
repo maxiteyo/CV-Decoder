@@ -28,6 +28,13 @@ EJEMPLO_RESPUESTA = {
         "secciones_detectadas": ["responsabilidades", "requisitos"],
         "confianza": "alta",
     },
+    "seniority": {
+        "anos_cv": 7,
+        "anos_pedidos": None,
+        "nivel_cv": None,
+        "nivel_oferta": None,
+        "ajuste": 1.0,
+    },
     "metadatos": {
         "archivo": "cv.pdf",
         "paginas": 1,
@@ -54,7 +61,13 @@ EJEMPLO_RESPUESTA = {
             "total_oferta": 4,
             "total_cv": 8,
         },
-        "similitud": {"puntaje": 38.9, "motor": "tfidf", "crudo": 0.0623},
+        "similitud": {
+            "puntaje": 38.9,
+            "motor": "tfidf",
+            "crudo": 0.0623,
+            "fuente": "texto_completo",
+            "detalle": {},
+        },
     },
 }
 
@@ -89,6 +102,14 @@ class SimilitudOut(BaseModel):
     puntaje: float = Field(ge=0, le=100, description="Puntaje calibrado de 0 a 100")
     motor: str = Field(description="Motor usado: tfidf (oficial), embeddings o embeddings_fragmentos")
     crudo: float = Field(ge=0, le=1, description="Coseno sin calibrar (0 a 1)")
+    fuente: Literal["secciones", "texto_completo"] = Field(
+        default="texto_completo",
+        description="Si se compararon secciones específicas o el texto completo",
+    )
+    detalle: dict[str, float] = Field(
+        default_factory=dict,
+        description="Puntajes por par de secciones: experiencia y habilidades",
+    )
 
 
 class DimensionesOut(BaseModel):
@@ -137,6 +158,24 @@ class RequisitosOut(BaseModel):
     )
 
 
+class SeniorityOut(BaseModel):
+    """Años y nivel detectados para el ajuste moderado del match (Fase 3)."""
+
+    anos_cv: int | None = Field(default=None, ge=0, description="Años trabajados estimados del CV")
+    anos_pedidos: int | None = Field(
+        default=None, ge=0, description="Años pedidos por la oferta, si se mencionan"
+    )
+    nivel_cv: str | None = Field(default=None, description="Nivel del CV: junior, mid, senior...")
+    nivel_oferta: str | None = Field(
+        default=None, description="Nivel pedido por la oferta, si se menciona"
+    )
+    ajuste: float = Field(
+        ge=0.5,
+        le=1.0,
+        description="Factor aplicado al match por déficit de años o nivel (nunca bonifica)",
+    )
+
+
 class DiagnosticoOut(BaseModel):
     """Resultado completo del diagnóstico de un CV contra una oferta."""
 
@@ -161,6 +200,7 @@ class DiagnosticoOut(BaseModel):
         description="Etiqueta cualitativa de puntaje_match"
     )
     requisitos: RequisitosOut
+    seniority: SeniorityOut
     metadatos: MetadatosOut
     dimensiones: DimensionesOut
 

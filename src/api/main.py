@@ -284,6 +284,7 @@ async def analyze_cv(
         "puntaje_match": resultado["puntaje_match"],
         "nivel_match": resultado["nivel_match"],
         "requisitos": resultado["requisitos"],
+        "seniority": resultado["seniority"],
         "metadatos": {
             "archivo": nombre,
             "paginas": len(leido["paginas"]),

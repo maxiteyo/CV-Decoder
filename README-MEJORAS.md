@@ -148,7 +148,7 @@ Se agregan campos sin romper los existentes:
 
 ### 2.6. Resultado medido
 
-Implementado y verificado con **28 tests en verde**:
+Implementado en esa fase y verificado con **28 tests en verde**:
 
 | Caso | Match | ATS | Nivel |
 |---|---:|---:|---|
@@ -162,6 +162,10 @@ El `par_005` bajó de 35,0 a 25,0 porque el gate de Fase 2 detecta que faltan
 requisitos centrales (`.net`, `asp.net`, `database design`, `oop`,
 `problem-solving`). Los pares buenos siguen solapando con algunos flojos
 (24,8 vs 22,7): eso se ataca en la Fase 3, no cambiando más pesos a mano.
+
+> Estos números son el cierre histórico de Fase 2. La Fase 3 los actualiza:
+> Laura y el arquitecto bajan por debajo de 10 y el match usa secciones y
+> seniority. Ver la tabla de 4.5.
 
 ### 2.7. Criterios de aceptación
 
@@ -243,7 +247,7 @@ El cap evita que la similitud léxica “tape” la ausencia de lo esencial.
 
 ### 3.6. Resultado medido
 
-Implementado con **28 tests en verde** (16 API + 4 parseabilidad + 8 diagnóstico):
+Implementado en esa fase con **28 tests en verde** (16 API + 4 parseabilidad + 8 diagnóstico):
 
 | Caso | Resultado |
 |---|---|
@@ -312,20 +316,51 @@ seniority nunca debe compensar la falta de skills centrales.
 
 ### 4.3. Refinar el ATS
 
-Agregar al ATS:
+Se agregó una regla conservadora: una lista de habilidades cuenta como sección
+solo si hay encabezado o un bloque dedicado con al menos 3 ítems separados y 2
+skills del diccionario. Así un CV sin sección “Habilidades” pero con skills
+mencionadas dentro de una frase de experiencia no infla el ATS. Contacto
+completo, fechas, tablas/columnas y tamaño de archivo quedan para la Fase 4.
 
-- datos de contacto completos;
-- fechas y cronología;
-- estructura sin tablas/columnas problemáticas;
-- formato de archivo y tamaño;
-- legibilidad de encabezados.
+### 4.4. Archivos que se tocan
 
-### 4.4. Criterios de aceptación
+| Archivo | Cambio |
+|---|---|
+| `src/core/diagnostico.py` | Segmentación del CV, similitud por secciones, años/nivel y ajuste de seniority. |
+| `src/api/schemas.py` | `seniority`, `similitud.fuente` y `similitud.detalle`. |
+| `src/api/main.py` | Copia `seniority` a la respuesta HTTP. |
+| `tests/test_diagnostico.py` | Laura, estudiante junior/senior, déficit de años y CV sin Habilidades. |
+| `tests/test_api.py` | Contrato de `seniority` y fórmula con ajuste. |
+| `README.md`, `docs/*` | Documentar la Fase 3 y los valores medidos. |
 
-- [ ] Laura vs QA Mobile: match bajo aunque tenga muchos años.
-- [ ] Estudiante de informática vs puesto junior: match medio/alto.
-- [ ] Estudiante de informática vs Senior: match medio, no bajo extremo.
-- [ ] CV con experiencia relevante pero sin sección “Habilidades”: match alto,
+### 4.5. Resultado medido
+
+Implementado con **33 tests en verde** (16 API + 4 parseabilidad + 13 diagnóstico):
+
+| Caso | Resultado |
+|---|---|
+| Laura (docente) vs QA Mobile | match **0,0** · ATS **96,7** · bajo; cap 25; ajuste 0,943 |
+| Arquitecto (Carlos Rossi) vs QA Mobile | match **9,8** · ATS **100** · bajo; cap 25 |
+| Estudiante de informática vs junior | match **92,7** · ATS **93,3** · muy bueno |
+| Estudiante de informática vs Senior | match **39,9** · ATS **93,3** · medio |
+| CV con experiencia relevante sin sección Habilidades | match **75,2** · ATS **77,5** · muy bueno |
+| `cv (5).pdf` vs `par_005` | match **25,0** · ATS **87,5** · medio |
+| 10 pares buenos del benchmark | **24,8–59,5** (mediana 48,9) |
+| 50 pares del banco de calificación | **1,1–43,9** (mediana 14,0) |
+
+La similitud por secciones se usa solo cuando existen Experiencia y Habilidades
+en el CV y Responsibilities y Requirements en la oferta; si falta alguna, se
+vuelve al texto completo. El ajuste de seniority es moderado (máximo 20% por
+años y 20% por nivel), nunca bonifica y se aplica antes del cap. El Spearman del
+`puntaje_match` contra las notas humanas quedó en **0,735**; la Fase 4 debe
+recalibrar los cortes, no cambiar pesos a ojo.
+
+### 4.6. Criterios de aceptación
+
+- [x] Laura vs QA Mobile: match bajo aunque tenga muchos años.
+- [x] Estudiante de informática vs puesto junior: match medio/alto.
+- [x] Estudiante de informática vs Senior: match medio, no bajo extremo.
+- [x] CV con experiencia relevante pero sin sección “Habilidades”: match alto,
       ATS menor.
 
 ---
@@ -430,7 +465,7 @@ poder comparar.
 - [x] Diagnóstico del problema actual.
 - [x] Fase 1.
 - [x] Fase 2.
-- [ ] Fase 3.
+- [x] Fase 3.
 - [ ] Fase 4.
 - [ ] Fase 5 (opcional).
 

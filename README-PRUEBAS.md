@@ -22,7 +22,7 @@ cd /home/sofia/CV-Decoder
 Resultado esperado:
 
 ```text
-28 passed
+33 passed
 ```
 
 Si falla algún test, no sigas con las otras pruebas: primero hay que revisar el
@@ -49,9 +49,18 @@ Resultado esperado:
   "cap_match": 25.0,
   "cobertura_obligatorios": 0.0
 },
+"seniority": {
+  "anos_cv": 7,
+  "anos_pedidos": null,
+  "nivel_cv": null,
+  "nivel_oferta": null,
+  "ajuste": 1.0
+},
 "similitud": {
   "puntaje": 38.9,
-  "crudo": 0.0623
+  "crudo": 0.0623,
+  "fuente": "texto_completo",
+  "detalle": {}
 }
 ```
 

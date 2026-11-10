@@ -98,7 +98,7 @@ En concordancia con los lineamientos de la modalidad grupal, el esfuerzo inicial
 * **Extracción de Texto PDF:** `pdfminer.six` (texto, respeta mejor los espacios) + `pdfplumber` (páginas e imágenes para detectar escaneos)
 * **Procesamiento de Lenguaje Natural (NLP):** `spaCy` (modelo NER entrenado en **inglés**; el español se cubre con embeddings multilingües + diccionario bilingüe).
 * **Vectorización y Embeddings:** `scikit-learn` (TF-IDF, motor oficial) y `sentence-transformers` (Modelo: `paraphrase-multilingual-mpnet-base-v2`, evaluado y descartado para el ordenamiento).
-* **Puntuación / Scoring:** dos puntajes independientes: **ATS** = 50% parseabilidad + 50% secciones; **match** = 90% similitud + 10% brecha ponderada de requisitos. La oferta se separa en obligatorios, deseables y beneficios; si faltan requisitos centrales se aplica un tope de 25 o 50. `puntaje_global` queda como alias de match. No se usa un clasificador entrenado porque no existen etiquetas de verdad para el score final.
+* **Puntuación / Scoring:** dos puntajes independientes: **ATS** = 50% parseabilidad + 50% secciones; **match** = 90% similitud + 10% brecha ponderada de requisitos, con ajuste moderado por años/nivel. La similitud compara Experiencia↔Responsibilities y Habilidades↔Requirements (60/40) cuando ambas secciones existen; si no, usa el texto completo. La oferta se separa en obligatorios, deseables y beneficios; si faltan requisitos centrales se aplica un tope de 25 o 50. `puntaje_global` queda como alias de match. No se usa un clasificador entrenado porque no existen etiquetas de verdad para el score final.
 * **Servicio y API REST:** `FastAPI`, `pydantic`, `uvicorn` y `python-multipart`
 
 ---

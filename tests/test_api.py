@@ -145,6 +145,14 @@ def test_diagnostico_completo(client, tmp_path):
     assert cuerpo["metadatos"]["palabras"] >= 20
     assert cuerpo["metadatos"]["motor_similitud"] == "tfidf"
     assert cuerpo["metadatos"]["tiempo_ms"] >= 0
+    assert set(cuerpo["seniority"]) == {
+        "anos_cv",
+        "anos_pedidos",
+        "nivel_cv",
+        "nivel_oferta",
+        "ajuste",
+    }
+    assert 0.5 <= cuerpo["seniority"]["ajuste"] <= 1.0
 
     dimensiones = cuerpo["dimensiones"]
     assert dimensiones["parseabilidad"]["puntaje"] == 100.0
@@ -164,14 +172,16 @@ def test_diagnostico_completo(client, tmp_path):
     assert similitud["motor"] == "tfidf"
     assert 0 <= similitud["crudo"] <= 1
     assert 0 <= similitud["puntaje"] <= 100
+    assert similitud["fuente"] in {"secciones", "texto_completo"}
+    assert isinstance(similitud["detalle"], dict)
 
-    # El global es alias del match y debe respetar los pesos configurados.
+    # El global es alias del match y debe respetar pesos, seniority y cap.
     esperado = (
         PESOS_POR_DEFECTO["similitud"] * similitud["puntaje"]
         + PESOS_POR_DEFECTO["secciones"] * secciones["puntaje"]
         + PESOS_POR_DEFECTO["keyword_gap"] * gap["puntaje"]
         + PESOS_POR_DEFECTO["parseabilidad"] * dimensiones["parseabilidad"]["puntaje"]
-    )
+    ) * cuerpo["seniority"]["ajuste"]
     cap = cuerpo["requisitos"]["cap_match"]
     if cap is not None:
         esperado = min(esperado, cap)
