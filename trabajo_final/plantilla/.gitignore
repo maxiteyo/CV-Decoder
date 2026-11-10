@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Datos y modelos pesados — descomentar lo que corresponda a tu proyecto
+# data/raw/*
+# !data/raw/.gitkeep
+# models/*.pkl
+# models/*.h5
+# models/*.pt
+
+# Variables de entorno / credenciales — NUNCA subir esto
+.env
+*.env.local
+
+# Logs y temporales
+*.log
+*.tmp
