@@ -29,7 +29,8 @@ sin saber que ya existía. Esa implementación duplicada quedó guardada en:
 - Stash `etapa-c-sofia-antes-de-integrar` (incluye los archivos sin commitear).
 
 La rama de trabajo nueva es **`etapa-c-integrada`**, creada desde `origin/main`.
-**No se modificó** `src/api/main.py` ni `tests/test_api.py`.
+Después se integraron las fases 1–4 del scoring, que sí tocan `diagnostico.py`,
+`schemas.py` y los tests.
 
 ---
 
@@ -100,7 +101,7 @@ etiquetas) y el motor de diagnóstico usa el esquema fino (10 etiquetas).
 
 ```bash
 python -m pytest -q
-# esperado: 33 passed (16 de API + 4 de parseabilidad + 13 de diagnóstico)
+# esperado: 35 passed (16 de API + 4 de parseabilidad + 15 de diagnóstico)
 
 uvicorn src.api.main:app --reload
 # Swagger: http://127.0.0.1:8000/docs

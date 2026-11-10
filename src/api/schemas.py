@@ -25,6 +25,7 @@ EJEMPLO_RESPUESTA = {
         "cobertura_obligatorios": 0.0,
         "cobertura_total": 0.0,
         "cap_match": 25.0,
+        "bono_skills": 0.0,
         "secciones_detectadas": ["responsabilidades", "requisitos"],
         "confianza": "alta",
     },
@@ -66,7 +67,7 @@ EJEMPLO_RESPUESTA = {
             "motor": "tfidf",
             "crudo": 0.0623,
             "fuente": "texto_completo",
-            "detalle": {},
+            "detalle": {"texto_completo": 38.9},
         },
     },
 }
@@ -99,16 +100,28 @@ class KeywordGapOut(BaseModel):
 class SimilitudOut(BaseModel):
     """Dimensión 4: parecido CV-oferta."""
 
-    puntaje: float = Field(ge=0, le=100, description="Puntaje calibrado de 0 a 100")
+    puntaje: float = Field(
+        ge=0,
+        le=100,
+        description=(
+            "Puntaje calibrado de 0 a 100. Cuando hay secciones, mezcla 80% texto "
+            "completo + 20% secciones; si no, usa texto completo."
+        ),
+    )
     motor: str = Field(description="Motor usado: tfidf (oficial), embeddings o embeddings_fragmentos")
-    crudo: float = Field(ge=0, le=1, description="Coseno sin calibrar (0 a 1)")
+    crudo: float = Field(
+        ge=0, le=1, description="Similitud cruda usada por el match (0 a 1), para auditoría"
+    )
     fuente: Literal["secciones", "texto_completo"] = Field(
         default="texto_completo",
         description="Si se compararon secciones específicas o el texto completo",
     )
     detalle: dict[str, float] = Field(
         default_factory=dict,
-        description="Puntajes por par de secciones: experiencia y habilidades",
+        description=(
+            "Puntajes de apoyo: experiencia, habilidades, texto_completo y secciones "
+            "cuando están disponibles"
+        ),
     )
 
 
@@ -148,7 +161,12 @@ class RequisitosOut(BaseModel):
         default=None,
         ge=0,
         le=100,
-        description="Tope aplicado al match si faltan requisitos centrales",
+        description="Tope gradual aplicado al match si faltan requisitos centrales",
+    )
+    bono_skills: float = Field(
+        ge=0,
+        le=40,
+        description="Bono por 4+ habilidades compartidas (máximo 40 puntos)",
     )
     secciones_detectadas: list[str] = Field(
         description="Secciones de la oferta usadas para extraer requisitos"
@@ -194,7 +212,10 @@ class DiagnosticoOut(BaseModel):
     puntaje_match: float = Field(
         ge=0,
         le=100,
-        description="Compatibilidad CV-oferta: 90% similitud + 10% brecha de skills",
+        description=(
+            "Compatibilidad CV-oferta: similitud calibrada + bono por skills, "
+            "ajustada por seniority y cap de requisitos"
+        ),
     )
     nivel_match: Literal["bajo", "medio", "bueno", "muy bueno"] = Field(
         description="Etiqueta cualitativa de puntaje_match"

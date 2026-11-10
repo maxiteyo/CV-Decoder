@@ -128,8 +128,26 @@ GRUPOS_EQUIVALENTES = (
 )
 
 PESO_DESEABLE = 0.4
+
+# Fase 4: el cap se vuelve gradual. Un CV sin ningún requisito central sigue
+# castigado a 25; a medida que cubre más obligatorios se libera el techo, sin
+# llegar nunca a compensar la falta total de skills.
 CAP_SIN_OBLIGATORIOS_BAJO = 25.0
-CAP_SIN_OBLIGATORIOS_MEDIO = 50.0
+CAP_SIN_OBLIGATORIOS_MEDIO = 55.0
+CAP_SIN_OBLIGATORIOS_ALTO = 75.0
+
+# Fase 4: bono por solapamiento fuerte de habilidades. El texto de un CV y una
+# oferta del mismo oficio puede parecer poco por diferencias de redacción; una
+# canasta de 4+ skills compartidas es evidencia concreta que TF-IDF no captura.
+BONO_SKILLS_MIN = 4
+BONO_SKILLS_POR_HABILIDAD = 8.0
+BONO_SKILLS_MAX = 40.0
+
+# Fase 4: calibración contra 50 pares con nota humana. La similitud de texto
+# completo ordena mejor (Spearman 0,95) que la de secciones (0,815); se conserva
+# una parte de la señal por secciones para no perder explicabilidad.
+PESO_SIMILITUD_SECCIONES = 0.20
+PESO_SIMILITUD_TEXTO_COMPLETO = 0.80
 
 # Fase 3: años y seniority. Solo se usan como ajuste moderado; nunca pueden
 # compensar la falta de habilidades centrales (el cap de requisitos manda).
@@ -179,11 +197,12 @@ ROL_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Pesos del match: la similitud manda y la brecha de skills aporta, pero la
-# calidad del CV (parseabilidad y secciones) no infla la compatibilidad.
+# Pesos del match: manda la similitud calibrada. La brecha de skills no suma
+# directo (hundía el orden contra las notas humanas), pero sigue actuando como
+# compuerta mediante el cap y como bono cuando hay solapamiento fuerte.
 PESOS_MATCH = {
-    "similitud": 0.90,
-    "keyword_gap": 0.10,
+    "similitud": 1.0,
+    "keyword_gap": 0.0,
     "secciones": 0.0,
     "parseabilidad": 0.0,
 }
@@ -410,6 +429,7 @@ def _similitud_por_secciones(
     modelo,
     cv_secciones: dict[str, str],
     competencias: dict,
+    similitud_texto_completo: float | None = None,
 ) -> tuple[float, str, dict[str, float]]:
     """Similitud experiencia↔responsabilidades y habilidades↔requisitos."""
     cv_experiencia = cv_secciones.get("experiencia", "")
@@ -432,7 +452,9 @@ def _similitud_por_secciones(
         }
         return crudo, "secciones", detalle
 
-    return modelo.similitud(cv_texto, oferta_texto), "texto_completo", {}
+    if similitud_texto_completo is None:
+        similitud_texto_completo = modelo.similitud(cv_texto, oferta_texto)
+    return similitud_texto_completo, "texto_completo", {}
 
 
 def normalizar_habilidad(habilidad: str) -> str:
@@ -460,12 +482,31 @@ def _coincide_habilidad(habilidad: str, skills_cv: set[str]) -> bool:
 
 
 def cap_por_requisitos(cobertura_obligatorios: float) -> float | None:
-    """Cap del match cuando faltan requisitos centrales (Fase 2)."""
-    if cobertura_obligatorios < 30.0:
+    """Cap gradual del match cuando faltan requisitos centrales (Fases 2 y 4).
+
+    El objetivo sigue siendo que un CV de otra área no parezca compatible solo
+    por compartir palabras. Los cortes se calibraron para no ahogar pares
+    buenos con cobertura parcial (por ejemplo, una oferta que lista 20 skills).
+    """
+    if cobertura_obligatorios < 15.0:
         return CAP_SIN_OBLIGATORIOS_BAJO
-    if cobertura_obligatorios < 50.0:
+    if cobertura_obligatorios < 30.0:
         return CAP_SIN_OBLIGATORIOS_MEDIO
+    if cobertura_obligatorios < 50.0:
+        return CAP_SIN_OBLIGATORIOS_ALTO
     return None
+
+
+def bono_por_skills(coincidencias: int) -> float:
+    """Bono acotado por solapamiento fuerte de habilidades (Fase 4).
+
+    Solo se activa con 4 o más coincidencias. Es una señal de dominio que el
+    texto libre diluye ("trabajé con Java, SQL, Spring y Git" vs. la misma lista
+    en la oferta) y que el cap por cobertura no debe ocultar.
+    """
+    if coincidencias < BONO_SKILLS_MIN:
+        return 0.0
+    return min(BONO_SKILLS_MAX, BONO_SKILLS_POR_HABILIDAD * coincidencias)
 
 
 def _competencias_de_oferta(oferta_texto: str, nlp) -> dict:
@@ -651,7 +692,7 @@ def analizar(
     """Devuelve el diagnóstico completo de un CV contra una oferta.
 
     ``pesos`` controla la fórmula del match (no la del ATS). El valor por
-    defecto usa 90% similitud + 10% brecha de skills.
+    defecto usa la similitud calibrada y suma el bono por skills compartidas.
     """
     pesos = pesos or PESOS_POR_DEFECTO
     nlp = get_nlp()
@@ -671,9 +712,22 @@ def analizar(
 
     cv_secciones = segmentar_cv(cv_texto)
     modelo = get_similarity_model(motor_similitud)
+    similitud_texto_completo = modelo.similitud(cv_texto, oferta_texto)
     similitud_valor, similitud_fuente, similitud_detalle = _similitud_por_secciones(
-        cv_texto, oferta_texto, modelo, cv_secciones, competencias
+        cv_texto,
+        oferta_texto,
+        modelo,
+        cv_secciones,
+        competencias,
+        similitud_texto_completo=similitud_texto_completo,
     )
+    if similitud_fuente == "secciones":
+        similitud_match_valor = (
+            PESO_SIMILITUD_SECCIONES * similitud_valor
+            + PESO_SIMILITUD_TEXTO_COMPLETO * similitud_texto_completo
+        )
+    else:
+        similitud_match_valor = similitud_texto_completo
 
     anos_cv = _anos_trabajados(cv_texto, cv_secciones["experiencia"])
     anos_pedidos = _anos_pedidos(competencias["texto_requisitos"])
@@ -688,7 +742,14 @@ def analizar(
     dim_parseabilidad = puntaje_parseabilidad(cv_texto)
     dim_secciones = round(100 * sum(secciones.values()) / len(secciones), 1)
     dim_gap = evaluacion["cobertura_total"]
-    dim_similitud = modelo.puntaje(similitud_valor)
+    dim_similitud = modelo.puntaje(similitud_match_valor)
+    similitud_detalle = {
+        **similitud_detalle,
+        "texto_completo": modelo.puntaje(similitud_texto_completo),
+    }
+    if similitud_fuente == "secciones":
+        similitud_detalle["secciones"] = modelo.puntaje(similitud_valor)
+    bono_skills = bono_por_skills(len(evaluacion["coincidencias"]))
 
     puntaje_ats = round(
         PESOS_ATS["parseabilidad"] * dim_parseabilidad
@@ -696,13 +757,17 @@ def analizar(
         1,
     )
     puntaje_match_bruto = round(
-        (
-            pesos["similitud"] * dim_similitud
-            + pesos["keyword_gap"] * dim_gap
-            + pesos["secciones"] * dim_secciones
-            + pesos["parseabilidad"] * dim_parseabilidad
-        )
-        * ajuste_seniority,
+        min(
+            100.0,
+            (
+                pesos["similitud"] * dim_similitud
+                + pesos["keyword_gap"] * dim_gap
+                + pesos["secciones"] * dim_secciones
+                + pesos["parseabilidad"] * dim_parseabilidad
+            )
+            * ajuste_seniority
+            + bono_skills,
+        ),
         1,
     )
     cap = evaluacion["cap_match"]
@@ -725,6 +790,7 @@ def analizar(
             "cobertura_obligatorios": evaluacion["cobertura_obligatorios"],
             "cobertura_total": evaluacion["cobertura_total"],
             "cap_match": cap,
+            "bono_skills": bono_skills,
             "secciones_detectadas": competencias["secciones_detectadas"],
             "confianza": competencias["confianza"],
         },
@@ -752,7 +818,7 @@ def analizar(
             "similitud": {
                 "puntaje": dim_similitud,
                 "motor": modelo.nombre,
-                "crudo": round(similitud_valor, 4),
+                "crudo": round(similitud_match_valor, 4),
                 "fuente": similitud_fuente,
                 "detalle": similitud_detalle,
             },

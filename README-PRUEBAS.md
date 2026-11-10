@@ -22,7 +22,7 @@ cd /home/sofia/CV-Decoder
 Resultado esperado:
 
 ```text
-33 passed
+35 passed
 ```
 
 Si falla algún test, no sigas con las otras pruebas: primero hay que revisar el
@@ -47,6 +47,7 @@ Resultado esperado:
 "nivel_match": "medio",
 "requisitos": {
   "cap_match": 25.0,
+  "bono_skills": 0.0,
   "cobertura_obligatorios": 0.0
 },
 "seniority": {
@@ -60,11 +61,20 @@ Resultado esperado:
   "puntaje": 38.9,
   "crudo": 0.0623,
   "fuente": "texto_completo",
-  "detalle": {}
+  "detalle": {"texto_completo": 38.9}
 }
 ```
 
 Si ves esos valores, el motor de diagnóstico funciona.
+
+Para evaluar la calibración del match contra las notas humanas:
+
+```bash
+.venv/bin/python scripts/eval_match.py
+```
+
+Resultado esperado: Spearman **0,9511**, pares buenos **51,2–93,5** y 0 falsos
+positivos con nota humana < 20 por encima de 30.
 
 > Si copiás un comando en varias líneas, la barra `\` tiene que ser el último
 > carácter, sin espacios después. Si no, bash intenta ejecutar `--pdf` como un

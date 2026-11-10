@@ -137,6 +137,7 @@ def test_diagnostico_completo(client, tmp_path):
         "cobertura_obligatorios",
         "cobertura_total",
         "cap_match",
+        "bono_skills",
         "secciones_detectadas",
         "confianza",
     }
@@ -175,13 +176,18 @@ def test_diagnostico_completo(client, tmp_path):
     assert similitud["fuente"] in {"secciones", "texto_completo"}
     assert isinstance(similitud["detalle"], dict)
 
-    # El global es alias del match y debe respetar pesos, seniority y cap.
+    # El global es alias del match y debe respetar pesos, bono, seniority y cap.
     esperado = (
-        PESOS_POR_DEFECTO["similitud"] * similitud["puntaje"]
-        + PESOS_POR_DEFECTO["secciones"] * secciones["puntaje"]
-        + PESOS_POR_DEFECTO["keyword_gap"] * gap["puntaje"]
-        + PESOS_POR_DEFECTO["parseabilidad"] * dimensiones["parseabilidad"]["puntaje"]
-    ) * cuerpo["seniority"]["ajuste"]
+        (
+            PESOS_POR_DEFECTO["similitud"] * similitud["puntaje"]
+            + PESOS_POR_DEFECTO["secciones"] * secciones["puntaje"]
+            + PESOS_POR_DEFECTO["keyword_gap"] * gap["puntaje"]
+            + PESOS_POR_DEFECTO["parseabilidad"] * dimensiones["parseabilidad"]["puntaje"]
+        )
+        * cuerpo["seniority"]["ajuste"]
+        + cuerpo["requisitos"]["bono_skills"]
+    )
+    esperado = min(100.0, esperado)
     cap = cuerpo["requisitos"]["cap_match"]
     if cap is not None:
         esperado = min(esperado, cap)

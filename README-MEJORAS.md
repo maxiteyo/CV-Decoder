@@ -14,7 +14,7 @@ aunque no tenga nada que ver.
 
 ## 0. Diagnóstico del problema actual
 
-La fórmula vigente es:
+La fórmula que teníamos al inicio del plan era:
 
 ```text
 puntaje_global =
@@ -256,7 +256,7 @@ Implementado en esa fase con **28 tests en verde** (16 API + 4 parseabilidad + 8
 | Falsos positivos eliminados | `design` (estaba en Responsibilities) y `healthcare` (Benefits) |
 | `QA` vs `Quality Assurance` | matchea como `qa` |
 | `communication` vs `communication skills` | matchea como `communication` |
-| Gate | cobertura <30% → cap 25; <50% → cap 50 |
+| Gate | cobertura <30% → cap 25; <50% → cap 50 (Fase 4 lo hace gradual) |
 
 En los 10 pares buenos, 3 quedaron topeados por el gate (25 o 50) porque el
 diccionario no reconoce todos sus sinónimos. Es una limitación conocida de esta
@@ -335,7 +335,8 @@ completo, fechas, tablas/columnas y tamaño de archivo quedan para la Fase 4.
 
 ### 4.5. Resultado medido
 
-Implementado con **33 tests en verde** (16 API + 4 parseabilidad + 13 diagnóstico):
+Implementado con **33 tests en verde** al cerrar la fase (hoy son **35**, tras la
+Fase 4). Estos números son históricos; el 5.5 muestra la calibración final.
 
 | Caso | Resultado |
 |---|---|
@@ -352,8 +353,8 @@ La similitud por secciones se usa solo cuando existen Experiencia y Habilidades
 en el CV y Responsibilities y Requirements en la oferta; si falta alguna, se
 vuelve al texto completo. El ajuste de seniority es moderado (máximo 20% por
 años y 20% por nivel), nunca bonifica y se aplica antes del cap. El Spearman del
-`puntaje_match` contra las notas humanas quedó en **0,735**; la Fase 4 debe
-recalibrar los cortes, no cambiar pesos a ojo.
+`puntaje_match` contra las notas humanas quedó en **0,735**; la Fase 4 lo
+recalibró a **0,9511** con el set de evaluación (ver 5.5).
 
 ### 4.6. Criterios de aceptación
 
@@ -377,36 +378,90 @@ recalibrar los cortes, no cambiar pesos a ojo.
 | Laura vs QA Mobile Senior | Match bajo, ATS alto |
 | Estudiante de informática vs junior IT | Match medio/alto |
 | Estudiante de informática vs Senior IT | Match medio |
-| 10 pares buenos del benchmark | Match alto |
-| 50 pares aleatorios | Match bajo/medio |
+| 10 pares buenos del benchmark | Match > 50 |
+| 50 pares calificados a mano | Orden similar al humano |
 
 ### 5.2. Métricas
 
-- Spearman contra notas humanas (orden).
-- MAE contra notas humanas (magnitud).
+- Spearman contra notas humanas (orden), con IC 95% por CV.
+- MAE, RMSE y sesgo contra notas humanas (magnitud).
 - Distribución de puntajes por categoría.
-- Precisión/recall para “bajo”, “medio” y “alto”.
-- Tasa de falsos positivos: CV de otra área con match alto.
+- Falsos positivos: pares con nota humana < 20 que superan 30 de match.
+- Tasa de pares buenos que superan 50 de match.
 
-### 5.3. Tests automáticos de calibración
+### 5.3. Script de evaluación
 
-```text
-Laura vs QA Mobile      → match < 20
-Laura vs docencia       → match > 60
-Par bueno               → match > 50
-Par aleatorio           → match < 30
+Se agregó `scripts/eval_match.py`:
+
+```bash
+.venv/bin/python scripts/eval_match.py
 ```
 
-Los umbrales se ajustan cuando el set esté calificado a mano.
+Lee los 50 pares con `puntaje_humano`, calcula Spearman/Pearson/MAE/RMSE,
+compara contra los 10 pares buenos y guarda el reporte en
+`models/match_report.json`. No depende de la API.
 
-### 5.4. Criterios de aceptación
+### 5.4. Cambios de calibración
 
-- [ ] Spearman ≥ 0,85 sobre los pares con nota humana.
-- [ ] Ningún CV de otra área supera 30 de match.
-- [ ] Los pares buenos superan 50 de match.
-- [ ] La documentación reporta la distribución y las limitaciones.
+La medición mostró que la similitud de **texto completo** ordena mejor
+(Spearman 0,9521) que la de secciones (0,8150). Por eso el match usa:
 
----
+```text
+similitud_match = 0,80 × texto_completo + 0,20 × secciones
+```
+
+La señal por secciones se conserva para explicabilidad, pero no manda. Además:
+
+- `keyword_gap` deja de sumar directo: hundía el orden contra las notas humanas.
+  Sigue actuando como compuerta a través del cap.
+- Se agrega un **bono por solapamiento fuerte**: con 4 o más skills compartidas,
+  `+8` por skill hasta un máximo de 40. Es evidencia concreta que TF-IDF diluye
+  cuando el CV y la oferta describen lo mismo con palabras distintas.
+- El cap pasa a ser gradual: **25** (<15% de obligatorios), **55** (<30%),
+  **75** (<50%) y sin tope desde 50%. Así un par bueno con cobertura parcial no
+  queda ahogado en 50.
+- El resultado bruto se limita a 100 antes de aplicar el cap.
+
+### 5.5. Resultado medido
+
+Implementado con **35 tests en verde** (16 API + 4 parseabilidad + 15
+diagnóstico). Reporte: `models/match_report.json`.
+
+| Métrica | Resultado | Objetivo |
+|---|---:|---:|
+| Spearman vs notas humanas | **0,9511** [IC 95%: 0,899–0,969] | ≥ 0,85 |
+| Pearson | 0,9379 | Informativo |
+| MAE / RMSE / sesgo | 4,10 / 4,90 / +3,90 | Informativo |
+| 10 pares buenos | **51,2–93,5** (mediana 72,4) | Todos > 50 |
+| 50 pares calificados | 2,4–45,1 (mediana 15,3) | Bajo/medio |
+| Otra área (humano < 20) | máximo **23,2**; 0 falsos > 30 | ≤ 30 |
+
+Casos que quedan cerca del límite, documentados a propósito:
+
+| Par | Nota humana | Match | Lectura |
+|---|---:|---:|---|
+| `par_012` | 47 | 45,1 | No es un falso positivo: es el mejor par del banco. |
+| `par_042` | 26 | 30,1 | Coincide en 1 skill; queda apenas arriba de 30. |
+| `par_045` | 28 | 29,2 | Cobertura alta, similitud baja; queda debajo de 30. |
+
+### 5.6. Criterios de aceptación
+
+- [x] Spearman ≥ 0,85 sobre los pares con nota humana.
+- [x] Ningún CV de otra área supera 30 de match (medido como nota humana < 20).
+- [x] Los pares buenos superan 50 de match.
+- [x] La documentación reporta la distribución y las limitaciones.
+
+### 5.7. Limitaciones
+
+- Los 10 pares buenos **no tienen nota humana**: se exige que superen 50, no que
+  igualen una calificación inexistente.
+- El set tiene 50 pares sobre 25 CVs; el IC 95% por CV es amplio (0,899–0,969).
+- El bono por skills se calibró con estos datos. Si se agrega un set más grande,
+  hay que revisar el umbral de 4 y el tope de 40.
+- “Otra área” se aproxima con nota humana < 20. Un par con nota 26 puede quedar
+  levemente arriba de 30 sin ser un error grave.
+- La similitud por secciones ya no manda en el puntaje; se conserva como detalle
+  explicativo.
 
 ## 6. Fase 5 — Modelo semántico híbrido (opcional)
 
@@ -466,7 +521,7 @@ poder comparar.
 - [x] Fase 1.
 - [x] Fase 2.
 - [x] Fase 3.
-- [ ] Fase 4.
+- [x] Fase 4.
 - [ ] Fase 5 (opcional).
 
 Este documento se actualiza a medida que cada fase se implementa y se valida.

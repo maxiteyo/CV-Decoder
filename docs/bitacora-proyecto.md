@@ -24,8 +24,8 @@ con un diagnóstico en 4 dimensiones:
 |---|---|---|---|
 | 1 | Parseabilidad | ¿Se puede leer el texto del PDF? | ATS (50%) |
 | 2 | Secciones | ¿Tiene Contacto, Experiencia, Educación y Habilidades? | ATS (50%) |
-| 3 | Brecha de habilidades | ¿Qué pide la oferta y no está en el CV? | Match (10%) |
-| 4 | Similitud | ¿Qué tan parecido es el CV a la oferta? | Match (90%) |
+| 3 | Brecha de habilidades | ¿Qué pide la oferta y no está en el CV? | Match (cap) |
+| 4 | Similitud | ¿Qué tan parecido es el CV a la oferta? | Match (calibrado) |
 
 El resultado expone **`puntaje_ats`** (calidad del CV como documento) y
 **`puntaje_match`** (compatibilidad con la oferta), ambos de 0 a 100.
@@ -302,6 +302,26 @@ error. Cambiar TF-IDF por embeddings (o agregar un motor nuevo) no cambia el
 contrato: solo cambia el número. Eso permite que un cliente programe contra la
 API sin depender de los detalles internos.
 
+### 4.12 La calibración del match se midió, no se eligió a ojo
+
+La Fase 3 dejó un Spearman de 0,735 contra las 50 notas humanas: el orden de la
+similitud por secciones era peor que el de texto completo (0,815 vs 0,952). La
+Fase 4 mezcla 80% texto completo + 20% secciones, usa la brecha como compuerta
+(cap gradual 25/55/75) y agrega un bono acotado cuando hay 4+ skills compartidas.
+Resultado medido con `scripts/eval_match.py`:
+
+| Métrica | Resultado |
+|---|---:|
+| Spearman del match | **0,9511** [IC 95%: 0,899–0,969] |
+| MAE / RMSE | 4,10 / 4,90 |
+| 10 pares buenos | **51,2–93,5** (mediana 72,4) |
+| 50 pares calificados | 2,4–45,1 (mediana 15,3) |
+| Falsos positivos (humano < 20, match > 30) | **0**; máximo 23,2 |
+
+El `par_012` (nota humana 47) queda en 45,1: no es un falso positivo, es el
+mejor par del banco. Los 10 pares buenos no tienen nota humana, así que el
+criterio es que superen 50, no que igualen una calificación inexistente.
+
 ---
 
 ## 5. Errores y sorpresas (sirven para mostrar rigor en la defensa)
@@ -372,7 +392,7 @@ API sin depender de los detalles internos.
   comparar, asumiendo la primera carga (~35 s).
 - **¿Cómo se prueba la API?**
   `uvicorn src.api.main:app`, abrir `http://127.0.0.1:8000/docs` y usar "Try it
-  out"; o `python scripts/cliente_api.py`; o `python -m pytest -q` (33 pruebas).
+  out"; o `python scripts/cliente_api.py`; o `python -m pytest -q` (35 pruebas).
 
 ---
 
@@ -482,6 +502,7 @@ python scripts/eval_parseability.py --reales
 python scripts/eval_sections.py
 python scripts/eval_similarity.py --motor tfidf
 python scripts/eval_similarity.py --matriz
+python scripts/eval_match.py             # calibración del match final
 python scripts/build_ceiling_pairs.py   # opcional: techo con 10 pares buenos
 python scripts/eval_cv_reales.py
 ```
@@ -494,7 +515,7 @@ Para la API (el modelo ya tiene que estar entrenado):
 
 ```bash
 uvicorn src.api.main:app --reload    # en una terminal; abrir /docs
-python -m pytest -q                  # en otra; 33 pruebas
+python -m pytest -q                  # en otra; 35 pruebas
 ```
 
 Los PDFs reales y la planilla de pares calificados son datos del equipo: no están
@@ -530,13 +551,15 @@ Commits del proyecto (los más importantes):
 
 **Cerrado:** Etapa A (datos + NER + diccionario), Etapa B (parseabilidad real,
 secciones, similitud, calibración, mediciones y documentación), Etapa C (API
-FastAPI, pruebas y guía de uso) y scoring Fases 1–3 (ATS/match separados,
-requisitos obligatorios/deseables, similitud por secciones y seniority).
+FastAPI, pruebas y guía de uso) y scoring Fases 1–4 (ATS/match separados,
+requisitos obligatorios/deseables, similitud por secciones, seniority y
+calibración con Spearman 0,9511).
 
 **Siguiente:** preparar la defensa (presentación, demo y repaso de los números).
 La demo puede ser: levantar la API, mostrar `/docs`, diagnosticar un CV real
 (25,0 de match y 87,5 de ATS), mostrar el rechazo de un escaneo (422) y correr
-las 33 pruebas.
+las 35 pruebas. Para la calibración, `scripts/eval_match.py` muestra Spearman
+0,9511 y pares buenos 51,2–93,5.
 
 **Opcional — techo validado y recalibrado:** se armaron 10 pares nuevos del mismo
 oficio; el máximo coseno fue **0,1174**, así que el techo 0,10 saturaba. Se

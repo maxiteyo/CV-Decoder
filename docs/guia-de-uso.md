@@ -44,7 +44,7 @@ dimensiones:
 | Puntaje | Fórmula | Qué mide |
 |---|---:|---|
 | `puntaje_ats` | 50% parseabilidad + 50% secciones | Calidad del CV como documento. |
-| `puntaje_match` | (90% similitud + 10% brecha) × ajuste seniority | Compatibilidad con la oferta; se topa si faltan requisitos centrales. |
+| `puntaje_match` | similitud calibrada (80% texto completo + 20% secciones) + bono por skills, ajustada por seniority | Compatibilidad con la oferta; se topa si faltan requisitos centrales. |
 
 `puntaje_global` se conserva como alias de `puntaje_match` para no romper
 clientes viejos. Ninguno es una probabilidad ni una nota oficial: sirven para
@@ -170,13 +170,14 @@ del Apéndice A, el resultado esperado es aproximadamente:
 
 | Campo | Valor |
 |---|---:|
-| `puntaje_global` | 95,3 (alias de match) |
+| `puntaje_global` | 100,0 (alias de match) |
 | `puntaje_ats` | 100,0 |
-| `puntaje_match` | 95,3 |
+| `puntaje_match` | 100,0 |
 | `nivel_match` | muy bueno |
 | Parseabilidad | 100,0 |
 | Secciones | 100,0 (las cuatro presentes) |
 | Brecha de palabras clave | 83,3 (falta `project management`) |
+| Bono por skills | 40,0 (8 skills compartidas, tope) |
 | Similitud | 96,6 |
 
 Con un CV real los números suelen ser más bajos. Por ejemplo, con el archivo
@@ -184,13 +185,15 @@ Con un CV real los números suelen ser más bajos. Por ejemplo, con el archivo
 
 | Campo | Valor |
 |---|---:|
-| `puntaje_global` | 23,3 (alias de match) |
+| `puntaje_global` | 22,2 (alias de match) |
 | `puntaje_ats` | 87,5 |
-| `puntaje_match` | 23,3 |
+| `puntaje_match` | 22,2 |
 | `nivel_match` | medio |
 | Parseabilidad | 100,0 |
 | Secciones | 75,0 (falta Contacto) |
 | Brecha de palabras clave | 33,3 (coinciden `excel` y `python`) |
+| Cap aplicado | 75,0 (<50% de obligatorios) |
+| Bono por skills | 0,0 |
 | Similitud | 22,2 (texto completo) |
 | Años del CV / pedidos | 7 / no especificados |
 | Ajuste por seniority | 1,0 (sin penalización) |
@@ -284,12 +287,12 @@ archivo; `| python -m json.tool` ordena el JSON para leerlo mejor.
 Resultado esperado:
 
 ```text
-.................................                                        [100%]
-33 passed in 30.00s
+...................................                                      [100%]
+35 passed in 30.00s
 ```
 
-Son **33 pruebas**: 16 de la API (generan sus propios PDFs legibles, escaneados y
-rotos con `fpdf2` y `Pillow`) + 4 de parseabilidad + 13 del motor de diagnóstico.
+Son **35 pruebas**: 16 de la API (generan sus propios PDFs legibles, escaneados y
+rotos con `fpdf2` y `Pillow`) + 4 de parseabilidad + 15 del motor de diagnóstico.
 No dependen de `data/`. La primera corrida tarda unos 30 segundos por la carga
 del modelo; las siguientes son más rápidas.
 
@@ -553,7 +556,7 @@ curl -s http://127.0.0.1:8000/health
 .venv/bin/python -m pytest -q
 ```
 
-Resultado esperado: `estado: "ok"` y **33 pruebas en verde**. Después seguí desde
+Resultado esperado: `estado: "ok"` y **35 pruebas en verde**. Después seguí desde
 [A.4](#a4-probar-desde-el-navegador-swagger) para probar el diagnóstico.
 
 ---
@@ -564,9 +567,9 @@ La respuesta completa tiene esta forma (valores abreviados):
 
 ```json
 {
-  "puntaje_global": 23.3,
+  "puntaje_global": 22.2,
   "puntaje_ats": 87.5,
-  "puntaje_match": 23.3,
+  "puntaje_match": 22.2,
   "nivel_match": "medio",
   "requisitos": {
     "obligatorios_cumplidos": ["excel", "python"],
@@ -575,7 +578,8 @@ La respuesta completa tiene esta forma (valores abreviados):
     "deseables_faltantes": [],
     "cobertura_obligatorios": 33.3,
     "cobertura_total": 33.3,
-    "cap_match": 50.0,
+    "cap_match": 75.0,
+    "bono_skills": 0.0,
     "secciones_detectadas": ["texto_completo"],
     "confianza": "baja"
   },
@@ -619,7 +623,7 @@ La respuesta completa tiene esta forma (valores abreviados):
       "motor": "tfidf",
       "crudo": 0.0355,
       "fuente": "texto_completo",
-      "detalle": {}
+      "detalle": {"texto_completo": 22.2}
     }
   }
 }
@@ -630,19 +634,21 @@ Cómo interpretarlo:
 - **`puntaje_ats`**: calidad del CV como documento (parseabilidad + secciones).
   Un CV legible y completo saca un ATS alto aunque no tenga nada que ver con la
   oferta.
-- **`puntaje_match`**: compatibilidad real con la oferta (90% similitud + 10%
-  brecha ponderada, ajustada por seniority). Si falta lo central, se aplica un
-  tope de 25 o 50. Es el número que conviene mirar para decidir si el CV se
-  acerca al puesto.
+- **`puntaje_match`**: compatibilidad real con la oferta. Usa 80% similitud de
+  texto completo + 20% de secciones, suma un bono acotado si hay 4+ skills
+  compartidas y ajusta por seniority. Si falta lo central, se aplica un tope
+  gradual de 25, 55 o 75. Es el número que conviene mirar para decidir si el CV
+  se acerca al puesto.
 - **`requisitos`**: separa obligatorios de deseables y muestra el `cap_match`
-  aplicado. `confianza` baja significa que la oferta no tenía secciones claras y
-  se usó todo el texto.
+  aplicado y el `bono_skills`. `confianza` baja significa que la oferta no tenía
+  secciones claras y se usó todo el texto.
 - **`seniority`**: años estimados del CV, años pedidos por la oferta, nivel de
   cada lado y factor de ajuste (nunca mayor que 1: no bonifica).
 - **`puntaje_global`**: alias de `puntaje_match`, mantenido por compatibilidad.
 - **`similitud.fuente`**: `secciones` si comparó Experiencia↔Responsibilities y
   Habilidades↔Requirements; `texto_completo` si faltaba alguna sección.
-  `detalle` muestra esos dos componentes calibrados.
+  `detalle` muestra `experiencia`, `habilidades`, `texto_completo` y `secciones`
+  cuando están disponibles.
 - **`parseabilidad`**: 100 significa que el PDF tiene texto usable. Si es un
   escaneo, la API responde 422 y no devuelve un puntaje de 0.
 - **`secciones`**: porcentaje de las cuatro secciones presentes. Cada sección
@@ -651,8 +657,8 @@ Cómo interpretarlo:
   del CV. `coincidencias` son los que aparecen; `faltantes`, los que no.
   Un puntaje bajo no siempre es un mal CV: puede que la oferta use sinónimos que
   el motor TF-IDF no reconoce.
-- **`similitud`**: parecido textual global, calibrado a 0–100. El campo `crudo`
-  es el valor interno antes de calibrar; sirve para auditar.
+- **`similitud`**: parecido textual calibrado a 0–100. El campo `crudo` es la
+  similitud interna usada por el match antes de calibrar; sirve para auditar.
 - **`tiempo_ms`**: tiempo de lectura del PDF + NLP, **sin** contar la subida del
   archivo. En una máquina como la del equipo, un pedido caliente ronda 1 segundo
   con TF-IDF.
@@ -757,6 +763,13 @@ Correlación de Spearman : 0.9521  (objetivo >= 0.75)
 Pearson (magnitud)      : 0.9404
 ```
 
+Para evaluar el `puntaje_match` final (no solo la similitud):
+
+```bash
+python scripts/eval_match.py
+# Spearman 0,9511 · pares buenos 51,2–93,5 · 0 falsos positivos > 30
+```
+
 `--matriz` muestra por qué se eligió el “techo” de calibración de cada motor
 (TF-IDF 0,16; embeddings 0,60; fragmentos 0,70). El techo no cambia el orden de
 los CVs: sólo estira la escala para que el mejor par no saque 7/100.
@@ -793,10 +806,11 @@ Estos reportes se guardan en `models/*.json` para auditoría.
 | Parseabilidad sintética | 60/60 | `build_test_pdfs.py` + `eval_parseability.py` |
 | Parseabilidad real | 210/210 | requiere los 221 PDFs del equipo |
 | Spearman de similitud | 0,9521 | requiere las 50 notas humanas |
+| Spearman del match final | 0,9511 | `eval_match.py` (50 notas humanas) |
 | Pearson de similitud | 0,9404 | requiere las 50 notas humanas |
 | Techo TF-IDF validado | 0,16 (máx. 0,1174) | `build_ceiling_pairs.py` (10 pares) |
 | F1 de entidades (secundaria) | 0,4679 | `train_ner.py` (puede variar) |
-| Pruebas en total | 22/22 | `pytest -q` (16 API + 6 núcleo) |
+| Pruebas en total | 35/35 | `pytest -q` (16 API + 4 parseabilidad + 15 diagnóstico) |
 
 ---
 
@@ -810,7 +824,7 @@ permite:
 | Entrenar el NER | **Sí** | DataTurks + los dos repos de referencia. |
 | F1 de secciones ≈ 0,95 | **Sí** | El conjunto de prueba sale de DataTurks; puede variar unas centésimas. |
 | Parseabilidad sintética 60/60 | **Sí** | Los PDFs se generan con `fpdf2` y `Pillow`. |
-| Las 33 pruebas (API + núcleo) | **Sí** | Generan sus propios PDFs; sólo necesitan el modelo. |
+| Las 35 pruebas (API + núcleo) | **Sí** | Generan sus propios PDFs; sólo necesitan el modelo. |
 | Parseabilidad real 210/210 | **No** | Requiere los 221 PDFs del equipo y sus etiquetas. |
 | Spearman 0,9521 | **No** | Requiere las 50 calificaciones humanas del equipo. |
 | Tiempos de respuesta exactos | **No** | Dependen del hardware. El orden de magnitud sí se reproduce. |
@@ -919,8 +933,8 @@ PY
 
 Después subilo desde Swagger con la oferta de ejemplo de
 [A.4](#a4-probar-desde-el-navegador-swagger). El resultado esperado es
-**95,3 de match y 100 de ATS** (las cuatro secciones, similitud 96,6 y sólo falta
-`project management` en la brecha de palabras clave).
+**100 de match y 100 de ATS** (las cuatro secciones, similitud 96,6, bono 40 y
+sólo falta `project management` en la brecha de palabras clave).
 
 ---
 

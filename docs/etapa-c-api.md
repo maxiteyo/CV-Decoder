@@ -1,7 +1,7 @@
 # Etapa C — API REST del MVP
 
 **Fecha de cierre:** 2026-10-25
-**Estado:** terminada y probada (16 pruebas de API + 6 del núcleo = 22 en verde).
+**Estado:** terminada; contrato actualizado en Fase 4 (16 pruebas de API + 4 de parseabilidad + 15 del motor = 35 en verde).
 **Punto de entrada:** `src.api.main:app`
 **Endpoint principal:** `POST /api/v1/analyze-cv`
 
@@ -140,7 +140,7 @@ Abajo aparecen tres cosas:
 ### 3.1 Cómo leer la respuesta
 
 > El JSON de abajo es de un par distinto (`par_005`). Con la oferta de ejemplo de
-> arriba el match da **23,3** (similitud 22,2; brecha 33,3) y el ATS **87,5**,
+> arriba el match da **22,2** (similitud 22,2; brecha 33,3; cap 75) y el ATS **87,5**,
 > porque todo depende de la oferta que se pegue. Lo importante es la estructura,
 > no memorizar el número.
 
@@ -158,6 +158,7 @@ Abajo aparecen tres cosas:
     "cobertura_obligatorios": 0.0,
     "cobertura_total": 0.0,
     "cap_match": 25.0,
+    "bono_skills": 0.0,
     "secciones_detectadas": ["responsabilidades", "requisitos"],
     "confianza": "alta"
   },
@@ -199,7 +200,7 @@ Abajo aparecen tres cosas:
       "motor": "tfidf",
       "crudo": 0.0623,
       "fuente": "texto_completo",
-      "detalle": {}
+      "detalle": {"texto_completo": 38.9}
     }
   }
 }
@@ -209,10 +210,11 @@ Abajo aparecen tres cosas:
 |---|---|
 | `puntaje_global` | Alias de `puntaje_match` por compatibilidad (0–100). **No** es una probabilidad ni un "apto/no apto". |
 | `puntaje_ats` | Calidad del CV como documento: 50% parseabilidad + 50% secciones. |
-| `puntaje_match` | Compatibilidad con la oferta: (90% similitud + 10% brecha) × ajuste de seniority. |
+| `puntaje_match` | Compatibilidad con la oferta: similitud calibrada + bono por skills, ajustada por seniority. |
 | `nivel_match` | Etiqueta cualitativa: bajo, medio, bueno o muy bueno. |
 | `requisitos` | Requisitos obligatorios/deseables, cobertura y cap aplicado. |
-| `requisitos.cap_match` | Tope del match si falta lo central: 25 (<30% de obligatorios) o 50 (<50%). |
+| `requisitos.cap_match` | Tope gradual si falta lo central: 25 (<15% de obligatorios), 55 (<30%) o 75 (<50%). |
+| `requisitos.bono_skills` | Bono por 4+ skills compartidas (máximo 40). |
 | `seniority` | Años estimados/pedidos, nivel de CV/oferta y ajuste (0,5–1,0; nunca bonifica). |
 | `metadatos.paginas` | Páginas con estructura legible que encontró el lector. |
 | `metadatos.palabras` | Palabras de texto extraídas del PDF. |
@@ -223,17 +225,18 @@ Abajo aparecen tres cosas:
 | `keyword_gap.coincidencias` | Habilidades que pide la oferta **y** están en el CV. |
 | `keyword_gap.faltantes` | Habilidades que pide la oferta y **no** están en el CV. |
 | `keyword_gap.puntaje` | Cobertura ponderada de requisitos (obligatorios 100%, deseables 40%). |
-| `similitud.puntaje` | Parecido CV–oferta en escala 0–100 (calibrada). |
-| `similitud.crudo` | Coseno TF-IDF sin calibrar (0–1), para auditoría. |
+| `similitud.puntaje` | Parecido CV–oferta en escala 0–100 (80% texto completo + 20% secciones). |
+| `similitud.crudo` | Similitud cruda usada por el match (0–1), para auditoría. |
 | `similitud.fuente` | `secciones` si comparó Experiencia↔Responsibilities y Habilidades↔Requirements; si no, `texto_completo`. |
-| `similitud.detalle` | Puntajes de `experiencia` y `habilidades` cuando se usaron secciones. |
+| `similitud.detalle` | Puntajes de `experiencia`, `habilidades`, `texto_completo` y `secciones` cuando están disponibles. |
 
 Los puntajes se calculan por separado:
 **ATS = 50% parseabilidad + 50% secciones**;
-**match = 90% similitud + 10% brecha ponderada de requisitos**, multiplicado por
-un ajuste de seniority (0,5–1,0). Si la cobertura de obligatorios es menor al
-30%, el match se topa en 25; si es menor al 50%, en 50. `puntaje_global` es un
-alias de `puntaje_match`.
+**match = similitud calibrada + bono por skills**, multiplicado por un ajuste de
+seniority (0,5–1,0). La similitud mezcla 80% texto completo + 20% secciones; el
+bono se activa con 4+ skills compartidas y llega a 40. El cap es gradual: 25 si
+la cobertura de obligatorios es menor al 15%, 55 si es menor al 30% y 75 si es
+menor al 50%. `puntaje_global` es un alias de `puntaje_match`.
 
 ### 3.2 Probar los errores desde Swagger
 
@@ -428,14 +431,14 @@ OCR está fuera del alcance.
 Archivo: `tests/test_api.py` (16 pruebas). Generan sus propios PDFs al vuelo con
 `fpdf2` y `Pillow`, así que **no dependen de `data/`** (que no se versiona).
 Se suman `tests/test_quality.py` (4 pruebas de parseabilidad) y
-`tests/test_diagnostico.py` (13 pruebas del motor): **33 en total**.
+`tests/test_diagnostico.py` (15 pruebas del motor): **35 en total**.
 
 ```bash
 .venv/bin/python -m pytest -q       # resumen
 .venv/bin/python -m pytest -v       # nombre por nombre
 ```
 
-Resultado: **33 passed** en ~30 s (el modelo se carga una vez).
+Resultado: **35 passed** en ~30 s (el modelo se carga una vez).
 
 Qué cubren:
 
@@ -504,7 +507,7 @@ con el texto ya extraído tarda 0,05–0,20 s.
 5. Subir el CV escaneado → mostrar el **422** con `PDF_SIN_TEXTO` y la sugerencia.
 6. Poner una oferta de dos palabras → mostrar **422** `OFERTA_MUY_CORTA`.
 7. Mostrar la pestaña **Schemas** de Swagger: el contrato es público.
-8. Cerrar con `.venv/bin/python -m pytest -q` → **33 passed**.
+8. Cerrar con `.venv/bin/python -m pytest -q` → **35 passed**.
 9. (Opcional) Mostrar `scripts/cliente_api.py` para probar sin navegador.
 
 Frase para el jurado: *"La API no guarda el CV, no requiere login y rechaza con

@@ -7,6 +7,7 @@ import pytest
 from src import config
 from src.core.diagnostico import (
     analizar,
+    bono_por_skills,
     cap_por_requisitos,
     normalizar_habilidad,
     segmentar_oferta,
@@ -142,12 +143,30 @@ def test_qa_matchea_quality_assurance_y_communication_skills():
     assert {"qa", "communication"} <= set(requisitos["obligatorios_cumplidos"])
 
 
-def test_cap_por_requisitos_centrales():
+def test_cap_gradual_por_requisitos_centrales():
     assert cap_por_requisitos(0) == 25.0
-    assert cap_por_requisitos(29.9) == 25.0
-    assert cap_por_requisitos(30) == 50.0
-    assert cap_por_requisitos(49.9) == 50.0
+    assert cap_por_requisitos(14.9) == 25.0
+    assert cap_por_requisitos(15) == 55.0
+    assert cap_por_requisitos(29.9) == 55.0
+    assert cap_por_requisitos(30) == 75.0
+    assert cap_por_requisitos(49.9) == 75.0
     assert cap_por_requisitos(50) is None
+
+
+def test_bono_por_solapamiento_fuerte_de_skills():
+    assert bono_por_skills(0) == 0.0
+    assert bono_por_skills(3) == 0.0
+    assert bono_por_skills(4) == 32.0
+    assert bono_por_skills(5) == 40.0
+    assert bono_por_skills(10) == 40.0
+
+
+def test_match_nunca_supera_cien_aunque_haya_bono():
+    resultado = analizar(CV, OFERTA, motor_similitud="tfidf")
+
+    assert resultado["puntaje_match"] <= 100
+    assert resultado["puntaje_global"] == resultado["puntaje_match"]
+    assert resultado["requisitos"]["bono_skills"] == 32.0
 
 
 def test_arquitecto_contra_qa_queda_bajo_y_sin_falsos_positivos():
@@ -214,10 +233,17 @@ def test_match_usa_secciones_y_expone_detalle():
     similitud = resultado["dimensiones"]["similitud"]
 
     assert similitud["fuente"] == "secciones"
-    assert set(similitud["detalle"]) == {"experiencia", "habilidades"}
-    assert similitud["puntaje"] == pytest.approx(
+    assert {"experiencia", "habilidades", "texto_completo", "secciones"} <= set(
+        similitud["detalle"]
+    )
+    assert similitud["detalle"]["secciones"] == pytest.approx(
         0.60 * similitud["detalle"]["experiencia"]
         + 0.40 * similitud["detalle"]["habilidades"],
+        abs=0.2,
+    )
+    assert similitud["puntaje"] == pytest.approx(
+        0.20 * similitud["detalle"]["secciones"]
+        + 0.80 * similitud["detalle"]["texto_completo"],
         abs=0.2,
     )
 
