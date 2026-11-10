@@ -329,6 +329,18 @@ cd CV-Decoder
 Requisitos: **Python 3.12** y `git`. Las versiones fijadas de `numpy` (2.5.4) y
 `pandas` (3.0.6) no instalan en Python 3.10/3.11.
 
+> Atajo recomendado con `uv` y `pyproject.toml`:
+>
+> ```bash
+> uv venv --python 3.12
+> source .venv/bin/activate
+> uv pip install -e ".[dev,notebooks]"
+> python -m spacy download en_core_web_sm
+> ```
+>
+> El resto de la guía usa `pip` y `requirements.txt` como alternativa con
+> versiones fijadas.
+
 ```bash
 python3 --version          # tiene que decir 3.12.x
 python3 -m venv .venv
@@ -839,12 +851,12 @@ personas reales). El código y los scripts para procesarlos sí están versionad
 
 | Archivo | Para qué sirve |
 |---|---|
-| `README.md` | Propuesta formal del proyecto (Project Charter). |
-| `docs/guia-de-uso.md` | Esta guía: instalar, probar y reproducir. |
-| `docs/etapa-a-resultados.md` | Datos, limpieza y modelo de entidades. |
-| `docs/etapa-b-resultados.md` | Parseabilidad, secciones, similitud y limitaciones. |
-| `docs/etapa-c-api.md` | API: endpoints, contrato, errores, pruebas y demo. |
-| `docs/bitacora-proyecto.md` | Recorrido, decisiones, preguntas del jurado y estado. |
+| `README.md` | Presentación del proyecto, instalación, uso y resultados. |
+| `docs/informe/guia-de-uso.md` | Esta guía: instalar, probar y reproducir. |
+| `docs/informe/etapa-a-resultados.md` | Datos, limpieza y modelo de entidades. |
+| `docs/informe/etapa-b-resultados.md` | Parseabilidad, secciones, similitud y limitaciones. |
+| `docs/informe/etapa-c-api.md` | API: endpoints, contrato, errores, pruebas y demo. |
+| `docs/informe/bitacora-proyecto.md` | Recorrido, decisiones, preguntas del jurado y estado. |
 | `src/api/main.py` | Endpoint, validaciones, errores y calentamiento. |
 | `src/core/diagnostico.py` | Motor que calcula ATS y match desde las cuatro dimensiones. |
 | `src/parsing/pdf_reader.py` | Lectura del PDF (texto + estructura). |

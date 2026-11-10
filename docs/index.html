@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CV-Decoder | Diagnóstico de CVs y optimización ATS</title>
+  <meta name="description" content="CV-Decoder analiza un CV en PDF contra una oferta laboral con NLP y devuelve un diagnóstico ATS y de compatibilidad explicable.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+  <nav>
+    <div class="container">
+      <span class="brand">CV-Decoder</span>
+      <ul>
+        <li><a href="#sobre">Sobre</a></li>
+        <li><a href="#demo">Demo</a></li>
+        <li><a href="#resultados">Resultados</a></li>
+        <li><a href="#autores">Autores</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="container">
+      <h1>CV-Decoder</h1>
+      <p class="tagline">Diagnóstico de CVs y optimización ATS multilingüe para postulantes y equipos de selección.</p>
+
+      <div class="badges">
+        <img src="https://img.shields.io/badge/python-3.12-blue.svg" alt="Python 3.12">
+        <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
+        <img src="https://img.shields.io/badge/status-MVP-orange.svg" alt="Estado MVP">
+      </div>
+
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/maxiteyo/CV-Decoder">Ver repositorio</a>
+        <a class="btn btn-secondary" href="https://github.com/maxiteyo/CV-Decoder#readme">Leer el README</a>
+      </div>
+    </div>
+  </header>
+
+  <section id="demo">
+    <div class="container">
+      <h2>Demo</h2>
+      <p class="lead">
+        El MVP recibe un CV en PDF y el texto de una oferta, y devuelve un JSON con
+        el puntaje ATS, el match con la vacante, los requisitos faltantes y la
+        similitud. La interfaz web interactiva todavía no está implementada; esta
+        página muestra la salida real del motor y el enlace al repositorio.
+      </p>
+      <div class="demo-media">
+        <img src="img/demo.png" alt="Ejemplo de salida JSON del diagnóstico de CV-Decoder">
+      </div>
+      <p class="note">
+        Estado actual: MVP funcional con API REST en FastAPI y Swagger. La demo
+        interactiva y las mejoras de la interfaz quedan para la entrega del trabajo final.
+      </p>
+    </div>
+  </section>
+
+  <section id="sobre">
+    <div class="container">
+      <h2>Sobre el proyecto</h2>
+      <p class="lead">
+        CV-Decoder responde dos preguntas que suelen confundirse en los filtros ATS:
+        si el CV está bien armado como documento y si realmente se adecúa a la oferta.
+        El sistema extrae texto del PDF, mide parseabilidad, detecta secciones,
+        reconoce entidades y habilidades, y compara el contenido con la vacante.
+      </p>
+      <p class="lead">
+        El enfoque prioriza explicabilidad: usa TF-IDF calibrado como motor principal,
+        spaCy para entidades y reglas explícitas para requisitos, seniority y brecha
+        de habilidades. Los embeddings multilingües se evaluaron, pero se descartaron
+        porque ordenaban peor los pares calificados por personas.
+      </p>
+
+      <h3>Construido con</h3>
+      <div class="pills">
+        <span class="pill">Python 3.12</span>
+        <span class="pill">FastAPI</span>
+        <span class="pill">spaCy</span>
+        <span class="pill">scikit-learn</span>
+        <span class="pill">pdfminer.six</span>
+        <span class="pill">pdfplumber</span>
+        <span class="pill">pytest</span>
+        <span class="pill">uv</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="resultados">
+    <div class="container">
+      <h2>Resultados</h2>
+      <p class="lead">
+        La calibración se midió contra 50 pares CV-oferta calificados a mano.
+        El match final ordena los pares de forma muy cercana a las notas humanas
+        y mantiene separados los CVs de otras áreas.
+      </p>
+
+      <div class="stats">
+        <div class="stat-card">
+          <div class="value">0,9511</div>
+          <div class="label">Spearman del match</div>
+        </div>
+        <div class="stat-card">
+          <div class="value">0,953</div>
+          <div class="label">F1 de secciones</div>
+        </div>
+        <div class="stat-card">
+          <div class="value">100%</div>
+          <div class="label">Parseabilidad en PDFs de prueba</div>
+        </div>
+        <div class="stat-card">
+          <div class="value">4,10</div>
+          <div class="label">MAE del match</div>
+        </div>
+      </div>
+
+      <div class="demo-media">
+        <img src="img/resultados.png" alt="Gráfico de match del sistema contra la calificación humana">
+      </div>
+      <p class="note">
+        Muestra: 50 pares sobre 25 CVs. Los pares buenos quedan entre 51,2 y 93,5;
+        los CVs de otras áreas no superan 23,2 de match. Las limitaciones y el detalle
+        técnico están en el README y en docs/informe/.
+      </p>
+    </div>
+  </section>
+
+  <section id="autores">
+    <div class="container">
+      <h2>Autores</h2>
+      <div class="authors">
+        <div class="author-card">
+          <div class="name">Máximo Teyo</div>
+          <div class="links">
+            <a href="https://github.com/maxiteyo">GitHub</a>
+            <a href="https://www.linkedin.com/in/maximoteyo/">LinkedIn</a>
+          </div>
+        </div>
+        <div class="author-card">
+          <div class="name">Sofía Milagros Suppia</div>
+          <div class="links">
+            <a href="https://github.com/SofiaSuppia">GitHub</a>
+            <a href="https://www.linkedin.com/in/sofiasuppia/">LinkedIn</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>
+        MVP — Inteligencia Artificial (2026) · IUA | Universidad de la Defensa Nacional<br>
+        <a href="https://github.com/maxiteyo/CV-Decoder">Código fuente en GitHub</a>
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>

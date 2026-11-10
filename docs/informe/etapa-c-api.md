@@ -549,7 +549,7 @@ y el contrato JSON es estable."*
 ## 14. Reproducir en otra máquina
 
 La guía completa, pensada para alguien que clona el repositorio por primera vez,
-está en [`docs/guia-de-uso.md`](guia-de-uso.md). Resumen:
+está en [`docs/informe/guia-de-uso.md`](guia-de-uso.md). Resumen:
 
 1. Clonar el repositorio e instalar dependencias (`README` §7.1). PyTorch CPU se
    instala desde su índice propio y `en_core_web_sm` no viene en
@@ -594,7 +594,7 @@ funciona igual con cualquier PDF que se suba desde Swagger.
 | `tests/test_quality.py` | 4 pruebas de parseabilidad. |
 | `tests/test_diagnostico.py` | 2 pruebas del motor de diagnóstico. |
 | `scripts/cliente_api.py` | Cliente de consola (sin dependencias extra). |
-| `docs/etapa-c-api.md` | Este documento. |
+| `docs/informe/etapa-c-api.md` | Este documento. |
 | `requirements.txt` | Dependencias nuevas fijadas. |
 | `README.md` | Actualizado con los comandos de la API. |
-| `docs/bitacora-proyecto.md` | Etapa C agregada al recorrido. |
+| `docs/informe/bitacora-proyecto.md` | Etapa C agregada al recorrido. |

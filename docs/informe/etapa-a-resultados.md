@@ -87,7 +87,7 @@ de prueba, combinando el modelo de entidades + reglas (email/teléfono) + diccio
 > Los números de esta tabla se actualizaron al cerrar la Etapa B: se agregó la
 > señal de encabezados (antes el F1 macro era 0,945) y se limpió el diccionario.
 > El detalle del cambio y su efecto en CVs reales está en
-> `docs/etapa-b-resultados.md`.
+> `docs/informe/etapa-b-resultados.md`.
 
 Extracción de habilidades con diccionario: **34/34 CVs** con al menos 1 habilidad,
 **830 habilidades** encontradas (**24,4 por CV**, 149 distintas).

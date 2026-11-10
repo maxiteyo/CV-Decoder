@@ -10,7 +10,7 @@ Hay dos familias de motores:
 
 Por qué el oficial es TF-IDF: medido contra 50 pares calificados a mano, TF-IDF
 ordena mejor (Spearman 0,95) que los embeddings de documento entero (0,28) o por
-fragmentos (0,50). El detalle está en `docs/etapa-b-resultados.md`.
+fragmentos (0,50). El detalle está en `docs/informe/etapa-b-resultados.md`.
 
 Calibración: la similitud del coseno vive entre 0 y 1, pero en documentos largos
 nunca se acerca a 1. Por eso cada motor define un "techo" (el valor que

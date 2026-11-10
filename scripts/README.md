@@ -2,7 +2,7 @@
 
 Scripts de **curación de datos y validación** del proyecto CV-Decoder. Son
 **complementarios** al pipeline oficial: no forman parte del motor de
-diagnóstico (ver `src/`, `scripts/eval_*.py` y `docs/etapa-b-resultados.md`).
+diagnóstico (ver `src/`, `scripts/eval_*.py` y `docs/informe/etapa-b-resultados.md`).
 
 Cada script es ejecutable de forma independiente y reproducible (semilla 42).
 
@@ -129,7 +129,7 @@ estado, notas`.
 
 **Limitación documentada:** `Resume_str` proviene del HTML scrapeado, no del
 PDF, así que **no es ground-truth perfecto**. Por eso se normaliza el texto y se
-usa una medida tolerante. Ver `docs/metodologia-datos.md`.
+usa una medida tolerante. Ver `docs/informe/metodologia-datos.md`.
 
 ## Relación con el pipeline oficial
 

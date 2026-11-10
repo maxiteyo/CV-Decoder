@@ -20,11 +20,11 @@ Se reportan DOS senales:
 El texto de referencia proviene del HTML scrapeado, no del PDF, por lo que no
 es *ground truth* perfecto: hay diferencias de espacios, orden y saltos. Por
 eso se normaliza y se usa una medida tolerante (F1 de conjuntos de tokens), y
-se documenta la limitacion. Ver ``docs/metodologia-datos.md``.
+se documenta la limitacion. Ver ``docs/informe/metodologia-datos.md``.
 
 Este script es **auxiliar**; no forma parte del motor de diagnostico oficial
 (que se evalua con ``scripts/eval_parseability.py`` y se documenta en
-``docs/etapa-b-resultados.md``).
+``docs/informe/etapa-b-resultados.md``).
 
 Uso
 ---

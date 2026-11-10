@@ -1,0 +1,69 @@
+[project]
+name = "cv-decoder"
+version = "0.1.0"
+description = "Diagnóstico de CVs y optimización ATS multilingüe con NLP y una API REST."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Máximo Teyo" },
+    { name = "Sofía Milagros Suppia" },
+]
+keywords = ["nlp", "ats", "resume", "cv", "spacy", "fastapi", "scikit-learn"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "scikit-learn>=1.4",
+    "tqdm>=4.66",
+    "spacy>=3.7,<4",
+    "spacy-lookups-data>=1.0",
+    "pdfplumber>=0.11",
+    "pdfminer.six>=20231228",
+    "fpdf2>=2.8",
+    "pillow>=10",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "httpx>=0.27",
+]
+embeddings = [
+    "sentence-transformers>=3.0",
+    "transformers>=4.40",
+    "torch>=2.2",
+]
+lang = [
+    "lingua-language-detector>=2.0",
+]
+notebooks = [
+    "jupyter>=1.0",
+    "ipykernel>=6.29",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+]
+
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

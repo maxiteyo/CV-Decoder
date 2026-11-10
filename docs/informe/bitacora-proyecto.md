@@ -472,10 +472,10 @@ criterio es que superen 50, no que igualen una calificación inexistente.
 | `tests/test_api.py` | 16 pruebas automáticas de la API |
 | `tests/test_quality.py` | 4 pruebas de parseabilidad |
 | `tests/test_diagnostico.py` | 2 pruebas del motor de diagnóstico |
-| `docs/guia-de-uso.md` | Instalación desde cero, prueba paso a paso y reproducción |
-| `docs/etapa-a-resultados.md` | Resultados de datos y modelo de entidades |
-| `docs/etapa-b-resultados.md` | Resultados de parseabilidad, secciones y similitud |
-| `docs/etapa-c-api.md` | API: endpoints, errores, pruebas y demo |
+| `docs/informe/guia-de-uso.md` | Instalación desde cero, prueba paso a paso y reproducción |
+| `docs/informe/etapa-a-resultados.md` | Resultados de datos y modelo de entidades |
+| `docs/informe/etapa-b-resultados.md` | Resultados de parseabilidad, secciones y similitud |
+| `docs/informe/etapa-c-api.md` | API: endpoints, errores, pruebas y demo |
 
 Los datos (`data/`) y los reportes (`models/*.json`) **no se versionan**: pesan
 mucho y se regeneran con los scripts. El `.gitignore` los excluye a propósito.
@@ -486,7 +486,7 @@ mucho y se regeneran con los scripts. El `.gitignore` los excluye a propósito.
 
 Todos los scripts usan la semilla 42. La guía completa, con la descarga de
 datasets y las rutas exactas, está en
-[`docs/guia-de-uso.md`](guia-de-uso.md). Resumen:
+[`docs/informe/guia-de-uso.md`](guia-de-uso.md). Resumen:
 
 ```bash
 python -m venv .venv && source .venv/bin/activate

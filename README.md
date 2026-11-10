@@ -1,203 +1,346 @@
-# CV-Decoder: Diagnosticador de CVs y Optimizador ATS Multilingüe
+<div align="center">
 
-> **Asignatura:** Inteligencia Artificial (2026)  
-> **Institución:** Centro Regional Universitario Córdoba - IUA | Universidad de la Defensa Nacional  
-> **Docente:** Ing. González, Hernando Alexis  
-> **Modalidad:** Grupal (MVP Funcional)  
+# CV-Decoder
 
-> **¿Querés probarlo ya?** Seguí la guía paso a paso:
-> [`docs/guia-de-uso.md`](docs/guia-de-uso.md). Incluye instalación desde cero,
-> Swagger, `curl`, pruebas automáticas, datasets y solución de problemas.
+### Diagnóstico de CVs y optimización ATS multilingüe para postulantes y equipos de selección.
 
----
+[![Python](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-MVP-orange.svg)]()
 
-## 1. Contexto y Descripción del Problema
+[Demo en vivo](https://maxiteyo.github.io/CV-Decoder/) · [Repositorio](https://github.com/maxiteyo/CV-Decoder) · [Reportar un bug](https://github.com/maxiteyo/CV-Decoder/issues)
 
-En el mercado laboral actual, la primera barrera que enfrenta un postulante es un sistema **ATS** (*Applicant Tracking System*). Estos filtros automatizados descartan un gran porcentaje de currículums por incompatibilidades de formato (tablas, columnas complejas, texto no parseable) o por falta de coincidencia semántica de palabras clave frente a la oferta laboral.
-
-**CV-Decoder** es una solución basada en **Inteligencia Artificial (NLP y Machine Learning)** diseñada para auditar y diagnosticar un CV en formato PDF en relación con un puesto de trabajo específico. El sistema analiza el documento en español, inglés o *spanglish*, evalúa la integridad del texto, extrae entidades clave y calcula la similitud semántica contra la vacante, entregando un reporte técnico estructurado para optimizar las probabilidades de éxito del candidato frente a los sistemas ATS.
+</div>
 
 ---
 
-## 2. Modelado del Entorno (Modelo PEAS)
+## Tabla de contenidos
 
-Para definir formalmente el comportamiento del agente de IA, se establece la matriz PEAS:
-
-| Componente | Descripción |
-| :--- | :--- |
-| **Performance (Métricas)** | • F1-Score $\ge 0.80$ en la **detección de secciones** del CV (Contacto, Experiencia, Educación, Habilidades). Métrica secundaria: F1 de extracción de entidades.<br>• Correlación Spearman $\ge 0.75$ en la similitud semántica.<br>• Tiempo de inferencia por PDF $< 3.0$ segundos. |
-| **Environment (Entorno)** | Archivos PDF heterogéneos de CVs (1 y 2 columnas, bilingües) y bloques de texto no estructurado que representan ofertas de empleo (*Job Descriptions*). |
-| **Actuators (Actuadores)** | API REST que emite un objeto **JSON estructurado** con el score global de compatibilidad, tasa de parseabilidad, secciones faltantes y brecha de palabras clave (*skills gap*). |
-| **Sensors (Sensores)** | Lector de archivos PDF (`pdfminer.six` para el texto + `pdfplumber` para páginas/imágenes) y endpoints HTTP de entrada (`POST /api/v1/analyze-cv`) desarrollados en **FastAPI**. |
-
----
-
-## 3. Origen y Naturaleza de los Datos
-
-El proyecto utiliza tres conjuntos de datos complementarios extraídos de fuentes públicas para el entrenamiento, la calibración y el análisis exploratorio (EDA):
-
-1. **Dataset de NER para CVs ([Resume Entities for NER - Kaggle](https://www.kaggle.com/datasets/dataturks/resume-entities-for-ner)):**
-   * **Naturaleza:** Archivo en formato JSON con CVs anotados a nivel de token (`Skills`, `Degree`, `Designation`, `Companies`, `Years of Experience`).
-   * **Uso:** Entrenamiento y fine-tuning del modelo de Reconocimiento de Entidades Nombradas (NER).
-2. **Dataset de Ofertas Laborales ([LinkedIn Job Postings - Kaggle](https://www.kaggle.com/datasets/arshkon/linkedin-job-postings)):**
-   * **Naturaleza:** Dataset tabular (JSON/CSV) con descripciones reales de puestos en tecnología y gestión.
-   * **Uso:** Calibración del motor de similitud (TF-IDF) y construcción de diccionarios de competencias requeridas.
-3. **Dataset de Evaluación (Benchmark Interno):**
-   * **Naturaleza:** **221 PDFs reales** de CVs (profesiones variadas, casi todos en inglés; 26 escaneados sin capa de texto) + **60 PDFs sintéticos** de control (una columna, dos columnas, escaneado).
-   * **Uso:** Medición *End-to-End* de parseabilidad y de calidad de extracción. Los PDFs reales no se versionan (pesan 37 MB y no hacen falta para reproducir el código).
-
-### Tratamiento y Limpieza de Datos (EDA)
-Dado que los datasets de origen se presentan en estructuras jerárquicas JSON, el pipeline de datos ejecuta un proceso de aplanamiento (*flattening*) con `pandas.json_normalize` para transformar los datos a estructuras tabulares. Se aplican controles de:
-* Eliminación de documentos vacíos o corruptos (longitud < 100 caracteres o > 50,000 caracteres).
-* Sanitización de etiquetas HTML residuales y caracteres Unicode no imprimibles.
-* Desduplicación estricta de documentos para evitar filtrado de información (*data leakage*) entre entrenamiento y prueba.
+- [Demo](#demo)
+- [Sobre el proyecto](#sobre-el-proyecto)
+  - [Contexto académico](#contexto-académico)
+  - [Construido con](#construido-con)
+- [El dataset](#el-dataset)
+- [Metodología](#metodología)
+- [Resultados](#resultados)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Instalación](#instalación)
+- [Uso](#uso)
+- [Roadmap](#roadmap)
+- [Autores](#autores)
+- [Licencia](#licencia)
+- [Agradecimientos y referencias](#agradecimientos-y-referencias)
 
 ---
 
-## 4. Métricas de Éxito y Baseline
+## Demo
 
-### Baseline (Punto de Comparación sin IA Avanzada)
-El punto de comparación inicial (**Baseline**) consiste en un script clásico de coincidencia de cadenas basado en **TF-IDF + Regex**. Este algoritmo ingenuo cuenta coincidencias exactas de palabras sin considerar la estructura interna del PDF ni la equivalencia semántica de los términos (ej. no comprende que *"Software Engineer"* y *"Desarrollador de Software"* son equivalentes).
+El MVP devuelve un diagnóstico estructurado en JSON a partir de un CV en PDF y el texto de una oferta laboral. La demostración pública es una página estática con el resumen del proyecto, las métricas principales y un ejemplo de salida; la interfaz interactiva queda para la etapa de trabajo final.
 
-### Métricas Objetivas de Éxito
-Para superar al baseline, el modelo de IA debe cumplir con las siguientes métricas estadísticas:
-* **Detección de Secciones:** $F1\text{-}Score \ge 0.80$ al decidir si el CV contiene cada sección clave (Contacto, Experiencia, Educación, Habilidades). *(Resultado medido: **0,953**).*
-* **Extracción de Entidades (métrica secundaria):** $F1\text{-}Score$ de las etiquetas detalladas (nombre, email, empresa, título, etc.). Con 220 CVs anotados, el valor realista es 0,4–0,6 (no 0,80).
-* **Similitud Semántica:** Correlación de orden de Spearman $r_s \ge 0.75$ evaluada frente a pares de (CV, Vacante) calificados por expertos. *(Resultado medido: **0,952** con TF-IDF; embeddings: 0,278).*
-* **Desempeño Operativo:** Cobertura de parseabilidad correcta en al menos el $90\%$ de los formatos de PDF testeados. *(Resultado medido: **100%** en 210 PDFs reales únicos y 60/60 sintéticos).*
+![Ejemplo de salida del diagnóstico](docs/img/demo.png)
 
-> **Nota sobre habilidades:** en el dataset, las habilidades están anotadas como **bloques** (toda la lista junta), no una por una. Por eso la extracción de habilidades se resuelve con un **diccionario curado** (necesario además para el *keyword gap*), y no se le exige un F1 de token exacto.
+**Demo en vivo:** https://maxiteyo.github.io/CV-Decoder/
 
-> **Resultados completos:** [`docs/etapa-a-resultados.md`](docs/etapa-a-resultados.md) (datos y modelo de entidades), [`docs/etapa-b-resultados.md`](docs/etapa-b-resultados.md) (parseabilidad, secciones, similitud y limitaciones) y [`docs/etapa-c-api.md`](docs/etapa-c-api.md) (API REST, pruebas y guía de uso). El recorrido del proyecto, decisión por decisión, está en [`docs/bitacora-proyecto.md`](docs/bitacora-proyecto.md).
+La página se publica con GitHub Pages desde la rama `main`, carpeta `/docs`. La API se puede probar localmente con Swagger en `http://127.0.0.1:8000/docs`; las instrucciones están en [Uso](#uso).
 
 ---
 
-## 5. Límites del Alcance (Out of Scope - MVP)
+## Sobre el proyecto
 
-En concordancia con los lineamientos de la modalidad grupal, el esfuerzo inicial se concentra de manera exclusiva en la ingeniería de datos, el modelado de IA y la API de inferencia:
+CV-Decoder es un sistema de Procesamiento de Lenguaje Natural (NLP) que audita un currículum en PDF contra una oferta de trabajo. El objetivo es responder dos preguntas que suelen mezclarse en las herramientas ATS: si el CV está bien armado como documento y si se adecúa realmente al puesto al que se postula.
 
-[ PDF del CV ] + [ Texto de Vacante ] ==> (│    Core CV-Decoder    │ ◄── Extracción + NER + Similitud) ==> [ JSON con Diagnóstico ]
+El sistema extrae texto del PDF, mide su parseabilidad, detecta secciones, reconoce entidades y habilidades, y compara el contenido del CV con la oferta. A partir de eso devuelve dos puntajes independientes: `puntaje_ats` (calidad del documento) y `puntaje_match` (compatibilidad con la vacante), acompañados por el detalle de requisitos cumplidos, requisitos faltantes, similitud y nivel de compatibilidad.
 
-### Incluido en el MVP:
-* API REST funcional desarrollada en **FastAPI**.
-* Endpoint `POST /api/v1/analyze-cv` que recibe el archivo PDF del CV y un string con la oferta laboral.
-* Pipeline de NLP que procesa el texto, identifica entidades y calcula la similitud CV–oferta (motor oficial: **TF-IDF con stopwords ES+EN**; embeddings multilingües evaluados y descartados por su bajo ordenamiento).
-* Retorno de un JSON estandarizado con 4 dimensiones de diagnóstico: *Match Semántico*, *Parseabilidad*, *Completitud de Secciones* y *Gaps de Palabras Clave*.
+El enfoque prioriza explicabilidad y reproducibilidad: usa TF-IDF calibrado como motor principal de similitud, spaCy para entidades y reglas explícitas para requisitos, secciones, seniority y brecha de habilidades. Los embeddings multilingües se evaluaron, pero se descartaron porque ordenaban peor los pares calificados por personas.
 
-### Fuera del Alcance (Out of Scope):
-* Frontend web o interfaces complejas en React/Angular (las pruebas se realizan vía Swagger/Postman).
-* Módulos de autenticación, login de usuarios o bases de datos relacionales persistentes.
-* Reescritura, edición o generación automática del archivo PDF resultante.
-* Scraping en tiempo real de portales de empleo.
+**Estado actual:** MVP funcional con API REST. El trabajo final incorporará una interfaz de presentación más completa y las mejoras pendientes del roadmap.
+
+### Contexto académico
+
+- **Asignatura:** Inteligencia Artificial (2026)
+- **Institución:** Centro Regional Universitario Córdoba - IUA | Universidad de la Defensa Nacional
+- **Cohorte / año:** 2026
+- **Docente:** Ing. González, Hernando Alexis
+- **Modalidad:** grupal
+
+### Construido con
+
+- [Python 3.12](https://www.python.org/)
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [spaCy](https://spacy.io/)
+- [scikit-learn](https://scikit-learn.org/)
+- [pdfminer.six](https://pdfminersix.readthedocs.io/) y [pdfplumber](https://github.com/jsvine/pdfplumber)
+- [pandas](https://pandas.pydata.org/) y [NumPy](https://numpy.org/)
+- [pytest](https://pytest.org/)
+- [uv](https://docs.astral.sh/uv/)
 
 ---
 
-## 6. Arquitectura Técnica y Stack Tecnológico
+## El dataset
 
-* **Lenguaje Principal:** Python **3.12** (el entorno reproducible del equipo usa 3.12.3; los pins de `requirements.txt` lo requieren)
-* **Extracción de Texto PDF:** `pdfminer.six` (texto, respeta mejor los espacios) + `pdfplumber` (páginas e imágenes para detectar escaneos)
-* **Procesamiento de Lenguaje Natural (NLP):** `spaCy` (modelo NER entrenado en **inglés**; el español se cubre con embeddings multilingües + diccionario bilingüe).
-* **Vectorización y Embeddings:** `scikit-learn` (TF-IDF, motor oficial) y `sentence-transformers` (Modelo: `paraphrase-multilingual-mpnet-base-v2`, evaluado y descartado para el ordenamiento).
-* **Puntuación / Scoring:** dos puntajes independientes: **ATS** = 50% parseabilidad + 50% secciones; **match** = similitud calibrada (80% texto completo + 20% secciones) + bono por 4+ skills compartidas, con ajuste moderado por años/nivel. La oferta se separa en obligatorios, deseables y beneficios; faltantes centrales aplican un cap gradual de 25/55/75. `puntaje_global` queda como alias de match. La calibración se mide con `scripts/eval_match.py`: Spearman 0,9511 y pares buenos 51,2–93,5. No se usa un clasificador entrenado porque no existen etiquetas de verdad para el score final.
-* **Servicio y API REST:** `FastAPI`, `pydantic`, `uvicorn` y `python-multipart`
+El proyecto combina datasets públicos de Kaggle con un benchmark interno construido por el equipo. Los archivos pesados y los CVs reales no se versionan: se descargan o regeneran siguiendo la [guía de uso](docs/informe/guia-de-uso.md).
+
+| Campo | Detalle |
+|---|---|
+| Fuente | [DataTurks Resume NER](https://www.kaggle.com/datasets/dataturks/resume-entities-for-ner), [LinkedIn Job Postings](https://www.kaggle.com/datasets/arshkon/linkedin-job-postings), [1.3M LinkedIn Jobs & Skills](https://www.kaggle.com/datasets/asaniczka/1-3m-linkedin-jobs-and-skills-2024) y benchmark interno del equipo. |
+| Registros | Aproximadamente 220 CVs anotados para NER; 221 PDFs reales y 60 PDFs sintéticos de control en el benchmark; ofertas y habilidades en archivos CSV. |
+| Variables | Texto del CV, tokens y etiquetas NER, texto de la oferta, habilidades y puntaje humano de compatibilidad. |
+| Variable objetivo | Etiquetas de entidades para la extracción; puntaje de compatibilidad CV-oferta para el match. |
+| Período / cobertura | Los datasets públicos no declaran un período uniforme; el benchmark interno corresponde a 2026. |
+| Licencia del dataset | Cada dataset público se rige por los términos de su ficha de Kaggle. El benchmark interno es de uso académico y no se redistribuye porque contiene CVs reales. |
+
+Los PDFs reales del benchmark pueden contener datos personales. Por eso `data/raw/`, `data/processed/` y `data/benchmarks/` están ignorados en Git; el repositorio solo conserva la estructura de carpetas y las instrucciones de reproducción.
 
 ---
 
-## 7. Estructura del Repositorio
+## Metodología
 
-El proyecto cumple con la separación modular exigida por la cátedra:
+El pipeline completo recibe un PDF y una oferta, y produce un JSON con dos puntajes y cuatro dimensiones de diagnóstico:
 
 ```text
-cv-decoder/
-├── .gitignore              # Excluye data (crudos, benchmarks, PDFs reales), venv, cache y reportes
-├── README.md               # Propuesta formal y documentación técnica del proyecto (Project Charter)
-├── requirements.txt        # Manifiesto de dependencias con versiones exactas
-│
-├── data/                   # Excluido de Git. Datasets crudos, procesados y benchmarks
-│   ├── raw/                # Datasets originales en JSON / CSV
-│   ├── processed/          # Dataframes limpios + splits de entrenamiento
-│   └── benchmarks/         # PDFs sintéticos, PDFs reales y planillas de calificación
-│
-├── docs/                   # Documentación de resultados y bitácora del proyecto
-│   ├── guia-de-uso.md      # Instalación desde cero y prueba paso a paso
-│   ├── etapa-a-resultados.md
-│   ├── etapa-b-resultados.md
-│   ├── etapa-c-api.md      # API: endpoints, errores, pruebas y demo
-│   └── bitacora-proyecto.md
-│
-├── scripts/                # Scripts ejecutables (limpieza, entrenamiento, evaluación)
-│   ├── build_ner_dataset.py
-│   ├── train_ner.py
-│   ├── build_test_pdfs.py
-│   ├── build_pdf_labels.py
-│   ├── build_rating_pairs.py
-│   ├── eval_sections.py
-│   ├── eval_skills_gazetteer.py
-│   ├── eval_parseability.py
-│   ├── eval_cv_reales.py
-│   ├── eval_similarity.py
-│   ├── build_ceiling_pairs.py # Opcional: 10 pares buenos y validación del techo
-│   ├── demo_diagnostico.py
-│   └── cliente_api.py      # Probar la API desde la consola (sin dependencias extra)
-│
-├── src/                    # Código fuente modularizado
-│   ├── __init__.py
-│   ├── config.py           # Rutas y semilla global (42)
-│   ├── api/                # Endpoints FastAPI y esquemas Pydantic (Etapa C)
-│   ├── core/               # Motor de diagnóstico y carga única del modelo
-│   ├── data_loader/        # Lectura y limpieza de datos + diccionario de habilidades
-│   ├── parsing/            # Lectura de PDFs y control de parseabilidad (Etapa B)
-│   ├── models/             # Similitud (TF-IDF / embeddings) e inferencia
-│   └── utils/              # Funciones auxiliares y fijación de semillas
-│
-├── tests/                  # Pruebas automáticas (pytest)
-│   ├── conftest.py
-│   ├── test_api.py         # 16 pruebas de la API (generan sus propios PDFs)
-│   ├── test_quality.py     # 4 pruebas de parseabilidad
-│   └── test_diagnostico.py # 2 pruebas del motor de diagnóstico
-│
-└── models/                 # Artefactos y pesos guardados + reportes de evaluación (no versionados)
+PDF + oferta
+  -> lectura y control de parseabilidad
+  -> detección de secciones del CV
+  -> extracción de entidades y habilidades
+  -> separación de requisitos obligatorios y deseables
+  -> similitud CV-oferta
+  -> ajuste por seniority y cobertura
+  -> puntaje ATS + puntaje match + explicación
 ```
 
-### 7.1 Cómo ejecutar el diagnóstico hoy
+![Diagrama del pipeline](docs/img/pipeline.png)
 
-> La guía completa —con descarga de datasets, entrenamiento del modelo y
-> solución de problemas— está en [`docs/guia-de-uso.md`](docs/guia-de-uso.md).
+### Análisis exploratorio
+
+Los datasets originales vienen en JSON jerárquicos y CSV. El EDA incluyó aplanamiento con `pandas.json_normalize`, revisión de documentos vacíos o corruptos, sanitización de etiquetas HTML y caracteres no imprimibles, y deduplicación para evitar filtración de información entre entrenamiento y prueba.
+
+También se midió la calidad de los PDFs: cantidad de páginas vacías, texto no extraíble, PDFs escaneados y distribución de idiomas. Esa revisión derivó en el control de parseabilidad y en el rechazo explícito de PDFs sin capa de texto.
+
+### Preprocesamiento
+
+- Extracción de texto con `pdfminer.six` y control de páginas/imágenes con `pdfplumber`.
+- Limpieza de texto, normalización de espacios y eliminación de caracteres problemáticos.
+- Separación de secciones mediante encabezados y heurísticas.
+- Normalización de habilidades y sinónimos para comparar términos equivalentes.
+- Deduplicación y separación de datos para evitar que un mismo CV aparezca en entrenamiento y evaluación.
+
+### Modelos
+
+- **NER:** modelo de spaCy entrenado con el esquema fine de DataTurks para reconocer entidades del CV.
+- **Similitud:** TF-IDF con stopwords en español e inglés, calibrado con un techo de coseno. Es el motor oficial porque obtuvo el mejor ordenamiento contra las notas humanas.
+- **Embeddings:** se probaron modelos multilingües de `sentence-transformers`, tanto por documento como por fragmentos. Se descartaron porque su Spearman fue menor.
+- **Secciones:** detección de Experiencia, Educación, Habilidades y Contacto para el puntaje ATS y como señal explicativa del match.
+- **Requisitos:** separación de obligatorios, deseables y beneficios; los beneficios no afectan el match.
+- **Scoring:** `puntaje_ats = 50% parseabilidad + 50% secciones`; `puntaje_match` combina similitud de texto completo, similitud por secciones, bono por skills compartidas y ajuste moderado por seniority. Los requisitos obligatorios faltantes aplican un límite gradual.
+
+### Validación
+
+La calibración se hizo con 50 pares CV-oferta calificados a mano por el equipo, más 10 pares del mismo oficio usados como control. Se midió correlación de Spearman, Pearson, MAE, RMSE, sesgo, distribución de puntajes y falsos positivos. El detalle técnico está en [Resultados de la Etapa B](docs/informe/etapa-b-resultados.md) y en el [plan de mejoras](README-MEJORAS.md).
+
+---
+
+## Resultados
+
+El motor final ordena los pares de forma muy cercana a las calificaciones humanas y mantiene separados los CVs de otras áreas.
+
+| Métrica | Baseline | Modelo final |
+|---|---:|---:|
+| Spearman del match | 0,61 (fórmula inicial de cuatro dimensiones) | **0,9511** [IC 95%: 0,899–0,969] |
+| F1 de secciones | No medido en la fórmula inicial | **0,953** |
+| Parseabilidad correcta | No medido en la fórmula inicial | **100%** en 210 PDFs reales únicos y 60 sintéticos |
+| MAE del match | No aplica | **4,10** |
+| Pearson del match | No aplica | **0,9379** |
+| Pares buenos del benchmark | No aplica | **51,2–93,5** (mediana 72,4) |
+| Pares de otras áreas (humano < 20) | No aplica | máximo **23,2**; 0 falsos positivos > 30 |
+
+![Resultados de la evaluación](docs/img/resultados.png)
+
+Lectura crítica:
+
+- La muestra humana es chica: 50 pares sobre 25 CVs, con un intervalo de confianza amplio.
+- El NER está entrenado principalmente en inglés; el español se cubre con normalización y diccionario bilingüe, pero no con un modelo NER específico.
+- El score final es una calibración heurística explicable, no un clasificador entrenado con etiquetas masivas.
+- El bono por skills se calibró con este set; si se amplía la muestra hay que revisar el umbral y el tope.
+- Los CVs reales no se redistribuyen, así que la reproducción completa requiere descargar los datos y volver a generar el benchmark.
+
+---
+
+## Estructura del proyecto
+
+```text
+.
+├── README.md
+├── README-MEJORAS.md        # Plan y cierre de las fases de scoring
+├── pyproject.toml           # Dependencias y configuración del paquete
+├── uv.lock                  # Resolución reproducible de dependencias
+├── requirements.txt         # Alternativa con versiones fijadas (pip)
+├── LICENSE
+├── .gitignore
+├── src/                     # Código fuente modular
+│   ├── api/                 # FastAPI y esquemas Pydantic
+│   ├── core/                # Motor de diagnóstico y carga de modelos
+│   ├── data_loader/         # Lectura y limpieza de datos
+│   ├── models/              # Similitud TF-IDF y embeddings
+│   ├── parsing/             # Lectura de PDFs y parseabilidad
+│   └── utils/               # Utilidades y semillas
+├── scripts/                 # Scripts de datos, entrenamiento y evaluación
+├── notebooks/               # Flujo completo reproducible
+├── tests/                   # Pruebas automáticas con pytest
+├── data/
+│   ├── raw/                 # Datasets originales (no versionados)
+│   ├── processed/           # Datos procesados (no versionados)
+│   └── benchmarks/          # PDFs y planillas de evaluación (no versionados)
+├── models/                  # Modelos entrenados (no versionados)
+└── docs/
+    ├── index.html           # Demo estática para GitHub Pages
+    ├── assets/style.css
+    ├── img/                 # Capturas y gráficos
+    └── informe/             # Documentación técnica detallada
+```
+
+---
+
+## Instalación
+
+### Prerrequisitos
+
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
+- Git
+- Python 3.12
+
+### Pasos
 
 ```bash
-# Crear entorno e instalar dependencias
-python -m venv .venv && source .venv/bin/activate
-pip install "torch==2.14.1+cpu" --index-url https://download.pytorch.org/whl/cpu
-pip install -r requirements.txt
+# 1. Clonar el repositorio
+git clone https://github.com/maxiteyo/CV-Decoder.git
+cd CV-Decoder
+
+# 2. Crear el entorno virtual
+uv venv --python 3.12
+source .venv/bin/activate
+
+# 3. Instalar el proyecto y las dependencias de desarrollo
+uv pip install -e ".[dev,notebooks]"
+
+# 4. Descargar el modelo de spaCy usado por el pipeline
 python -m spacy download en_core_web_sm
-
-# Generar el dataset y entrenar el modelo de entidades (si models/ está vacío)
-python scripts/build_ner_dataset.py
-python scripts/train_ner.py --sources dataturks --schema fine --output ner_dataturks_sm
-
-# Diagnosticar un PDF real contra una oferta de la planilla de pares
-python scripts/demo_diagnostico.py --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" --par par_005
-
-# Levantar la API y probarla desde el navegador
-uvicorn src.api.main:app --reload
-#   -> http://127.0.0.1:8000/docs
-#   -> GET http://127.0.0.1:8000/health
-
-# Probar la API desde la consola (con el servidor corriendo en otra terminal)
-python scripts/cliente_api.py --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" --par par_005
-
-# Correr las pruebas automáticas de la API
-python -m pytest -q
-
-# Reproducir todas las mediciones
-python scripts/build_pdf_labels.py
-python scripts/eval_parseability.py --reales
-python scripts/eval_sections.py
-python scripts/eval_similarity.py --motor tfidf
-python scripts/eval_similarity.py --matriz
-python scripts/build_ceiling_pairs.py   # opcional: valida el techo con 10 pares
 ```
 
-> El techo TF-IDF quedó en **0,16** tras validarlo con 10 pares nuevos del mismo
-> oficio (máximo coseno 0,1174). Los pares están en
-> `data/benchmarks/pares_buenos.csv` para calificación humana.
+Si se van a usar los motores de embeddings, instalar además:
+
+```bash
+uv pip install torch --index-url https://download.pytorch.org/whl/cpu
+uv pip install -e ".[embeddings]"
+```
+
+### Datos y modelo
+
+Los datos pesados no están en Git. La descarga y regeneración está documentada en la [guía de uso](docs/informe/guia-de-uso.md). El modelo NER entrenado tampoco se versiona; si `models/ner_dataturks_sm/` no existe, generarlo con:
+
+```bash
+uv run python scripts/train_ner.py --sources dataturks --schema fine --output ner_dataturks_sm
+```
+
+---
+
+## Uso
+
+### Notebook del flujo completo
+
+```bash
+uv run jupyter notebook notebooks/01_pipeline_completo.ipynb
+```
+
+La notebook muestra carga de un PDF, extracción de texto, parseabilidad, secciones, similitud, scoring y evaluación.
+
+### API local
+
+```bash
+uv run uvicorn src.api.main:app --reload
+```
+
+Luego abrir:
+
+- Swagger: `http://127.0.0.1:8000/docs`
+- Estado del servicio: `http://127.0.0.1:8000/health`
+
+### Diagnóstico por consola
+
+```bash
+uv run python scripts/demo_diagnostico.py \
+  --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" \
+  --par par_005
+```
+
+Ejemplo de campos de salida:
+
+```json
+{
+  "puntaje_global": 25.0,
+  "puntaje_ats": 87.5,
+  "puntaje_match": 25.0,
+  "nivel_match": "medio",
+  "requisitos": {
+    "cap_match": 25.0,
+    "bono_skills": 0.0,
+    "cobertura_obligatorios": 0.0
+  },
+  "similitud": {
+    "puntaje": 38.9,
+    "fuente": "texto_completo"
+  }
+}
+```
+
+### Cliente de la API
+
+Con la API corriendo en otra terminal:
+
+```bash
+uv run python scripts/cliente_api.py \
+  --pdf "data/benchmarks/pdfs_reales/cv (5).pdf" \
+  --par par_005
+```
+
+### Pruebas
+
+```bash
+uv run pytest -q
+```
+
+Resultado esperado: **35 passed**.
+
+La guía paso a paso, los errores frecuentes y los detalles de cada endpoint están en [docs/informe/guia-de-uso.md](docs/informe/guia-de-uso.md) y [docs/informe/etapa-c-api.md](docs/informe/etapa-c-api.md).
+
+---
+
+## Roadmap
+
+- [ ] Interfaz web o demo interactiva para el trabajo final.
+- [ ] NER específico para español y mejor cobertura multilingüe.
+- [ ] Modelo de scoring entrenado con un set de pares más grande.
+- [ ] OCR para PDFs escaneados.
+- [ ] Más familias de puestos y taxonomía de roles.
+
+---
+
+## Autores
+
+- **Máximo Teyo** — [GitHub](https://github.com/maxiteyo) · [LinkedIn](https://www.linkedin.com/in/maximoteyo/)
+- **Sofía Milagros Suppia** — [GitHub](https://github.com/SofiaSuppia) · [LinkedIn](https://www.linkedin.com/in/sofiasuppia/)
+
+---
+
+## Licencia
+
+Este proyecto está bajo la licencia [MIT](LICENSE). Los datasets conservan sus propias licencias y condiciones de uso; los CVs reales del benchmark no se redistribuyen.
+
+---
+
+## Agradecimientos y referencias
+
+- [DataTurks Resume Entities for NER](https://www.kaggle.com/datasets/dataturks/resume-entities-for-ner)
+- [LinkedIn Job Postings](https://www.kaggle.com/datasets/arshkon/linkedin-job-postings)
+- [1.3M LinkedIn Jobs & Skills](https://www.kaggle.com/datasets/asaniczka/1-3m-linkedin-jobs-and-skills-2024)
+- [spaCy](https://spacy.io/), [scikit-learn](https://scikit-learn.org/), [FastAPI](https://fastapi.tiangolo.com/), [pdfminer.six](https://pdfminersix.readthedocs.io/) y [pdfplumber](https://github.com/jsvine/pdfplumber)
+- Cátedra de Inteligencia Artificial (2026), IUA | Universidad de la Defensa Nacional.

@@ -1,17 +1,17 @@
-# --- Contexto interno y plan de trabajo (no se suben a Git) ---
+# --- Contexto interno (no se sube a Git) ---
 contexto.txt
-docs/plan-interno.md
 
 # --- Datos crudos y procesados (no se versionan) ---
-data/raw/
-data/processed/
+# Se conservan las carpetas vacías con .gitkeep para que el clon tenga la
+# estructura que pide la plantilla. Los archivos reales quedan fuera de Git.
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
 # Benchmarks completos: incluyen cientos de CVs reales (PDFs) y las planillas
 # de calificación con texto de CVs. Se regeneran con los scripts de scripts/.
-data/benchmarks/
-
-# --- Paquete de datos para Maxi (duplica ~2 GB de datos) ---
-datos_para_maxi/
-datos_para_maxi.zip
+data/benchmarks/*
+!data/benchmarks/.gitkeep
 
 # --- Modelos entrenados y artefactos ---
 models/*
@@ -27,6 +27,9 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+build/
+dist/
+.ruff_cache/
 
 # --- Jupyter ---
 .ipynb_checkpoints/

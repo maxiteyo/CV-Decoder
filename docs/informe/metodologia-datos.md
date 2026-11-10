@@ -5,8 +5,8 @@ procesan y qué limitaciones tienen**. Está pensado para que la cátedra pueda
 auditar y reproducir cada decisión.
 
 > **Documento complementario.** El pipeline oficial del producto es el de
-> `src/` y `scripts/eval_*.py` (ver `docs/etapa-a-resultados.md` y
-> `docs/etapa-b-resultados.md`). Acá se documenta la **curación de datasets**
+> `src/` y `scripts/eval_*.py` (ver `docs/informe/etapa-a-resultados.md` y
+> `docs/informe/etapa-b-resultados.md`). Acá se documenta la **curación de datasets**
 > y **validaciones auxiliares**. La definición oficial de parseabilidad es
 > `src.parsing.quality.is_parseable` (≥30 palabras y ratio alfanumérico ≥0.5);
 > el `token_f1` es una validación complementaria de fidelidad de extracción.
@@ -109,7 +109,7 @@ valores.
 
 ### Qué resuelve
 Este script **no reemplaza** la medición oficial de parseabilidad (210 PDFs
-reales, `docs/etapa-b-resultados.md`). Aporta algo distinto: para cada PDF
+reales, `docs/informe/etapa-b-resultados.md`). Aporta algo distinto: para cada PDF
 compara el texto que extrae `read_pdf` contra su `Resume_str`, lo que permite
 medir de forma **automática y estadística** (no a mano) la **fidelidad de la
 extracción**. Además reporta `parseable_oficial` con la misma métrica que usa
@@ -180,7 +180,7 @@ parseables**: este dataset está compuesto casi en su totalidad por PDF
 **digitales homogéneos**. Sirve como **línea base de PDFs "limpios"**, no como
 muestra de la variedad real (escaneados, 2 columnas, tablas). Esa variedad la
 aporta el dataset `amineipad`. Además, la **medición oficial** de parseabilidad
-del proyecto es sobre 210 PDFs reales (`docs/etapa-b-resultados.md`), no sobre
+del proyecto es sobre 210 PDFs reales (`docs/informe/etapa-b-resultados.md`), no sobre
 este corpus. En el informe hay que presentar **ambos** números, cada uno con su
 corpus, para no sobreestimar.
 
@@ -278,5 +278,5 @@ python scripts/build_parseability_benchmark.py \
 | Corpus | 210 PDFs reales + 60 sintéticos | 100 amineipad, 2.484 LiveCareer, 5.035 Mehyaar |
 | Scripts | `scripts/eval_*.py` | `scripts/classify_cv_languages.py`, `scripts/build_parseability_benchmark.py` |
 | Datos | `data/benchmarks/` (ignorado, se regenera) | `data/raw/`, `data/processed/` (ignorados) |
-| Resultados | `docs/etapa-a-resultados.md`, `docs/etapa-b-resultados.md` | Este documento |
+| Resultados | `docs/informe/etapa-a-resultados.md`, `docs/informe/etapa-b-resultados.md` | Este documento |
 - Mismo dataset + mismo comando → mismo resultado.
